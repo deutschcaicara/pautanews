@@ -26,6 +26,86 @@ INITIAL_SOURCES = [
         }
     },
     {
+        "domain": "agenciabrasil.ebc.com.br",
+        "name": "Agência Brasil - Política",
+        "tier": 1,
+        "is_official": True,
+        "fetch_policy_json": {
+            "source_id": "agencia_brasil_politica",
+            "source_domain": "agenciabrasil.ebc.com.br",
+            "tier": 1,
+            "pool": "FAST_POOL",
+            "strategy": "RSS",
+            "endpoints": {"feed": "https://agenciabrasil.ebc.com.br/rss/politica/feed.xml"},
+            "cadence": {"interval_seconds": 300},
+            "limits": {"rate_limit_req_per_min": 10},
+        }
+    },
+    {
+        "domain": "www12.senado.leg.br",
+        "name": "Senado - Notícias",
+        "tier": 1,
+        "is_official": True,
+        "fetch_policy_json": {
+            "source_id": "senado_noticias",
+            "source_domain": "senado.leg.br",
+            "tier": 1,
+            "pool": "FAST_POOL",
+            "strategy": "RSS",
+            "endpoints": {"feed": "https://www12.senado.leg.br/noticias/rss"},
+            "cadence": {"interval_seconds": 600},
+            "limits": {"rate_limit_req_per_min": 5},
+        }
+    },
+    {
+        "domain": "www.camara.leg.br",
+        "name": "Câmara - Notícias",
+        "tier": 1,
+        "is_official": True,
+        "fetch_policy_json": {
+            "source_id": "camara_noticias",
+            "source_domain": "camara.leg.br",
+            "tier": 1,
+            "pool": "FAST_POOL",
+            "strategy": "HTML",
+            "endpoints": {"latest": "https://www.camara.leg.br/noticias/"},
+            "cadence": {"interval_seconds": 1800},
+            "limits": {"rate_limit_req_per_min": 5},
+        }
+    },
+    {
+        "domain": "www.poder360.com.br",
+        "name": "Poder360",
+        "tier": 1,
+        "is_official": False,
+        "fetch_policy_json": {
+            "source_id": "poder360",
+            "source_domain": "poder360.com.br",
+            "tier": 1,
+            "pool": "FAST_POOL",
+            "strategy": "RSS",
+            "endpoints": {"feed": "https://www.poder360.com.br/feed/"},
+            "cadence": {"interval_seconds": 300},
+            "limits": {"rate_limit_req_per_min": 5},
+        }
+    },
+    {
+        "domain": "www.jota.info",
+        "name": "JOTA - Notícias",
+        "tier": 1,
+        "is_official": False,
+        "fetch_policy_json": {
+            "source_id": "jota_noticias",
+            "source_domain": "jota.info",
+            "tier": 1,
+            "pool": "FAST_POOL",
+            "strategy": "RSS",
+            "endpoints": {"feed": "https://www.jota.info/feed"},
+            "cadence": {"interval_seconds": 600},
+            "limits": {"rate_limit_req_per_min": 5},
+        }
+    },
+    {
         "domain": "in.gov.br",
         "name": "Diário Oficial da União",
         "tier": 1,
@@ -43,16 +123,16 @@ INITIAL_SOURCES = [
     },
     {
         "domain": "tcu.gov.br",
-        "name": "TCU - Acórdãos",
+        "name": "TCU - Notícias",
         "tier": 1,
         "is_official": True,
         "fetch_policy_json": {
-            "source_id": "tcu_acordaos",
+            "source_id": "tcu_noticias",
             "source_domain": "tcu.gov.br",
             "tier": 1,
-            "pool": "DEEP_EXTRACT_POOL",
-            "strategy": "API",
-            "endpoints": {"api": "https://pesquisa.apps.tcu.gov.br/rest/publico/base/acordao/pesquisa"},
+            "pool": "FAST_POOL",
+            "strategy": "HTML",
+            "endpoints": {"latest": "https://portal.tcu.gov.br/imprensa/noticias/"},
             "cadence": {"interval_seconds": 3600},
             "limits": {"rate_limit_req_per_min": 2},
         }

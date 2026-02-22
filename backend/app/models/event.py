@@ -4,7 +4,7 @@ from __future__ import annotations
 import enum
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, func
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -37,6 +37,8 @@ class Event(Base):
     status: Mapped[EventStatus] = mapped_column(
         String(32), default=EventStatus.NEW, nullable=False, index=True
     )
+    summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    score_plantao: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
     flags_json: Mapped[dict | None] = mapped_column(
         JSONB, nullable=True, comment="UNVERIFIED_VIRAL etc."
     )

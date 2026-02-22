@@ -1,9 +1,10 @@
 [project]
-name = "radar-hard-news"
+name = "radar-de-pautas"
 version = "0.1.0"
-description = "Radar de Pautas Hard News + Oceano Azul"
+description = "Radar de Pautas — Inteligência Editorial"
 requires-python = ">=3.11"
 dependencies = [
+    "feedparser>=6.0.0",
     # ── API ──
     "fastapi>=0.115.0",
     "uvicorn[standard]>=0.34.0",

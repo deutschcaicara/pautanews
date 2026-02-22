@@ -14,37 +14,46 @@ from app.db import async_session_factory
 from app.models.event import Event, EventStatus
 from app.models.document import Document
 from app.schemas.source_profile import SourceProfile
+from app.core.taxonomy import infer_editorial_lane, infer_source_class
 
 logger = logging.getLogger(__name__)
 
 @celery.task(name="app.workers.organize.run_organization")
-def run_organization(profile_dict: Dict[str, Any], clean_text: str, content_hash: str):
+def run_organization(profile_dict: Dict[str, Any], clean_text: str, content_hash: str, url: str = None, title: str = None):
     """Lighweight Event Builder (Plantão Path)."""
     profile = SourceProfile(**profile_dict)
-    logger.info(f"Organizing event for {profile.source_id}")
+    logger.info(f"Organizing event for {profile.source_id} - URL: {url}")
 
     import asyncio
     loop = asyncio.get_event_loop()
-    loop.run_until_complete(_persist_data(profile, clean_text, content_hash))
+    loop.run_until_complete(_persist_data(profile, clean_text, content_hash, url, title))
 
-async def _persist_data(profile: SourceProfile, text: str, content_hash: str):
+async def _persist_data(profile: SourceProfile, text: str, content_hash: str, url: str, title: str):
     async with async_session_factory() as session:
-        # 1. Upsert Document
+        # 1. Infer lane and class if not explicit
+        lane = infer_editorial_lane(
+            title=title,
+            snippet=text[:500],
+            editoria=profile.source_id # Use source_id as hint
+        )
+        
+        # 2. Upsert Document
         doc = Document(
             source_id=profile.id,
-            title=f"Sugestão de Pauta: {profile.source_domain}",
-            url=profile.endpoints.get("feed") or profile.endpoints.get("latest") or profile.endpoints.get("api"),
-            raw_content=text[:2000],
+            title=title or f"Sugestão de Pauta: {profile.source_domain}",
+            url=url or profile.endpoints.get("feed") or profile.endpoints.get("latest"),
+            clean_text=text[:5000],
             content_hash=content_hash
         )
         session.add(doc)
 
-        # 2. Simple Event creation
+        # 3. Simple Event creation
         event = Event(
             status=EventStatus.NEW,
-            summary=f"Novo sinal de pauta em {profile.source_domain}",
-            score_plantao=50.0
+            summary=title or f"Novo sinal de pauta em {profile.source_domain}",
+            score_plantao=50.0 # Placeholder logic
         )
+        # Note: In a real M8/M9 we would use the taxonomy here
         session.add(event)
         await session.commit()
-        logger.info(f"Persisted doc and event for {profile.source_id}")
+        logger.info(f"Persisted doc and event for {profile.source_id} (Lane: {lane})")
