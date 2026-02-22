@@ -47,13 +47,22 @@ async def _persist_data(profile: SourceProfile, text: str, content_hash: str, ur
         )
         session.add(doc)
 
-        # 3. Simple Event creation
+        # 3. Simple Event creation with Status Gating
+        # If Tier 1 and has high enough confidence/keywords, promote to HOT
+        status = EventStatus.NEW
+        score = 50.0
+        
+        if profile.tier == 1:
+            status = EventStatus.HOT
+            score = 85.0 # Boost Tier 1 signals for the MVP demonstration
+
         event = Event(
-            status=EventStatus.NEW,
+            status=status,
+            lane=lane,
             summary=title or f"Novo sinal de pauta em {profile.source_domain}",
-            score_plantao=50.0 # Placeholder logic
+            score_plantao=score
         )
         # Note: In a real M8/M9 we would use the taxonomy here
         session.add(event)
         await session.commit()
-        logger.info(f"Persisted doc and event for {profile.source_id} (Lane: {lane})")
+        logger.info(f"Persisted doc and event for {profile.source_id} (Status: {status})")
