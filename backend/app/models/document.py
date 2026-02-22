@@ -47,4 +47,5 @@ class Document(Base):
     )
 
     def __repr__(self) -> str:
-        return f"<Document id={self.id} title={self.title[:50]!r if self.title else 'N/A'}>"
+        t = self.title[:50] if self.title else "N/A"
+        return f"<Document id={self.id} title={t!r}>"
