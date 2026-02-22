@@ -17,7 +17,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-radar_secret}
       POSTGRES_DB: ${POSTGRES_DB:-radar_news}
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT:-5434}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -25,15 +25,15 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
-
+ 
   rabbitmq:
     image: rabbitmq:3-management-alpine
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:-radar}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:-radar_secret}
     ports:
-      - "5672:5672"
-      - "15672:15672"
+      - "${RABBITMQ_PORT:-5674}:5672"
+      - "${RABBITMQ_UI_PORT:-15674}:15672"
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
     healthcheck:
@@ -41,11 +41,11 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
-
+ 
   redis:
     image: redis:7-alpine
     ports:
-      - "6379:6379"
+      - "${REDIS_PORT:-6381}:6379"
     volumes:
       - redis_data:/data
     healthcheck:
