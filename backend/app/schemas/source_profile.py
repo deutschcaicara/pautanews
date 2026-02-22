@@ -50,8 +50,9 @@ class Observability(BaseModel):
 class SourceProfile(BaseModel):
     """Source Profile DSL (Blueprint §6)."""
 
+    id: Optional[int] = None
     source_id: str
-    source_domain: str
+    source_domain: Optional[str] = None
     tier: int = Field(ge=1, le=3)
     is_official: bool = False
     lang: str = "pt-BR"

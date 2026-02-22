@@ -36,9 +36,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
 
 app = FastAPI(
-    title="Radar Hard News",
+    title="Radar de Pautas",
     version="0.1.0",
-    description="Async investigative journalism radar — Plantão + Oceano Azul",
+    description="Motor de radar de pautas para redações — Plantão + Oceano Azul",
     lifespan=lifespan,
 )
 
@@ -60,7 +60,7 @@ app.include_router(feedback_router)
 # ─── Dashboard ───
 @app.get("/", response_class=HTMLResponse, include_in_schema=False)
 async def dashboard():
-    """Painel de Controle Radar Hard News."""
+    """Painel de Controle Radar de Pautas."""
     async with async_session_factory() as session:
         sources_count = (await session.execute(select(func.count()).select_from(Source))).scalar() or 0
         events_hot = (await session.execute(select(func.count()).select_from(Event).where(Event.status == EventStatus.HOT))).scalar() or 0
@@ -73,7 +73,7 @@ async def dashboard():
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Radar Hard News | Dashboard</title>
+        <title>Radar de Pautas | Dashboard</title>
         <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
         <style>
             :root {{
@@ -163,10 +163,10 @@ async def dashboard():
     <body>
         <div class="container">
             <header>
-                <h1>Radar Hard News Engine</h1>
+                <h1>Radar de Pautas</h1>
                 <div class="pulse">
                     <div class="pulse-dot"></div>
-                    SISTEMA ONLINE & ORQUESTRANDO
+                    SISTEMA ONLINE & MONITORANDO
                 </div>
             </header>
 
@@ -177,15 +177,15 @@ async def dashboard():
                 </div>
                 <div class="card">
                     <span class="val" style="color: #fca311;">{events_new}</span>
-                    <span class="lab">Eventos Novos</span>
+                    <span class="lab">Sugestões de Pauta</span>
                 </div>
                 <div class="card">
                     <span class="val" style="color: #ef4444;">{events_hot}</span>
-                    <span class="lab">Eventos HOT</span>
+                    <span class="lab">Pautas Quentes (HOT)</span>
                 </div>
                 <div class="card">
                     <span class="val">{docs_count}</span>
-                    <span class="lab">Docs Capturados</span>
+                    <span class="lab">Docs Coletados</span>
                 </div>
             </div>
 
@@ -196,7 +196,7 @@ async def dashboard():
             </div>
         </div>
         <footer class="footer">
-            Investigative Journalism Intelligence System | v0.1.0-MVP
+            Inteligência Editorial para Redações | v0.1.0-MVP
         </footer>
     </body>
     </html>

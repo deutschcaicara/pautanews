@@ -16,6 +16,7 @@ INITIAL_SOURCES = [
         "is_official": False,
         "fetch_policy_json": {
             "source_id": "g1_politica",
+            "source_domain": "g1.globo.com",
             "tier": 1,
             "pool": "FAST_POOL",
             "strategy": "RSS",
@@ -31,6 +32,7 @@ INITIAL_SOURCES = [
         "is_official": True,
         "fetch_policy_json": {
             "source_id": "dou_oficial",
+            "source_domain": "in.gov.br",
             "tier": 1,
             "pool": "DEEP_EXTRACT_POOL",
             "strategy": "HTML",
@@ -46,6 +48,7 @@ INITIAL_SOURCES = [
         "is_official": True,
         "fetch_policy_json": {
             "source_id": "tcu_acordaos",
+            "source_domain": "tcu.gov.br",
             "tier": 1,
             "pool": "DEEP_EXTRACT_POOL",
             "strategy": "API",

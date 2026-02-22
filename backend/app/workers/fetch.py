@@ -64,7 +64,7 @@ async def _async_run_fetch(profile: SourceProfile):
             
             # Simple placeholder for M1 models interaction
             attempt = FetchAttempt(
-                source_id=1, # FIXME: lookup source ID correctly
+                source_id=profile.id,
                 url=url,
                 status_code=resp.status_code,
                 latency_ms=int(resp.elapsed.total_seconds() * 1000),

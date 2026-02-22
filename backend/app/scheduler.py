@@ -24,7 +24,11 @@ async def get_active_source_profiles() -> list[SourceProfile]:
 
         for source in sources:
             try:
-                profile = SourceProfile(**source.fetch_policy_json)
+                data = source.fetch_policy_json.copy()
+                data["id"] = source.id
+                if "source_domain" not in data:
+                    data["source_domain"] = source.domain
+                profile = SourceProfile(**data)
                 profiles.append(profile)
             except Exception as e:
                 logger.error(f"Invalid profile for source {source.id} ({source.domain}): {e}")
