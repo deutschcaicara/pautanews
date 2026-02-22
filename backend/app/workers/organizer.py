@@ -20,13 +20,31 @@ logger = logging.getLogger(__name__)
 @celery.task(name="app.workers.organize.run_organization")
 def run_organization(profile_dict: Dict[str, Any], clean_text: str, content_hash: str):
     """Lighweight Event Builder (Plantão Path)."""
-    # 1. Create/Update Document
-    # 2. Simple deduplication (Placeholders for M7)
-    # 3. Upsert Event
-    # 4. Emit SSE EVENT_UPSERT
-    
-    logger.info("Organizing event...")
-    
-    # Emit SSE via Redis Pub/Sub (FastAPI will listen to this)
-    # Placeholder for SSE emission
-    pass
+    profile = SourceProfile(**profile_dict)
+    logger.info(f"Organizing event for {profile.source_id}")
+
+    import asyncio
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(_persist_data(profile, clean_text, content_hash))
+
+async def _persist_data(profile: SourceProfile, text: str, content_hash: str):
+    async with async_session_factory() as session:
+        # 1. Upsert Document
+        doc = Document(
+            source_id=profile.id,
+            title=f"Sugestão de Pauta: {profile.source_domain}",
+            url=profile.endpoints.get("feed") or profile.endpoints.get("latest") or profile.endpoints.get("api"),
+            raw_content=text[:2000],
+            content_hash=content_hash
+        )
+        session.add(doc)
+
+        # 2. Simple Event creation
+        event = Event(
+            status=EventStatus.NEW,
+            summary=f"Novo sinal de pauta em {profile.source_domain}",
+            score_plantao=50.0
+        )
+        session.add(event)
+        await session.commit()
+        logger.info(f"Persisted doc and event for {profile.source_id}")

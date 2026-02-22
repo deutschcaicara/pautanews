@@ -19,16 +19,25 @@ def run_extraction(profile_dict: Dict[str, Any], raw_body: str, content_hash: st
     profile = SourceProfile(**profile_dict)
     logger.info(f"Extracting content for {profile.source_id}")
 
-    # 1. Trafilatura extraction
-    extracted = trafilatura.extract(
-        raw_body, 
-        include_comments=False,
-        include_tables=True,
-        no_fallback=False
-    )
+    # 1. Extraction strategy based on profile
+    extracted = None
+    if profile.strategy == StrategyType.RSS:
+        # Simple extraction for RSS (placeholder/mock for MVP text)
+        # In a real scenario, use feedparser
+        if "<item>" in raw_body or "<entry>" in raw_body:
+            extracted = f"RSS Feed Content Hash: {content_hash}\n(Raw XML capture)"
+            logger.info(f"RSS capture detected for {profile.source_id}")
+    else:
+        # Trafilatura extraction for HTML/SPA
+        extracted = trafilatura.extract(
+            raw_body, 
+            include_comments=False,
+            include_tables=True,
+            no_fallback=False
+        )
     
     if not extracted:
-        logger.warning(f"Trafilatura yielded no text for {profile.source_id}")
+        logger.warning(f"Extraction yielded no text for {profile.source_id} (Strategy: {profile.strategy})")
         return
 
     # 2. Trigger Document versioning & Anchor extraction (M4)
