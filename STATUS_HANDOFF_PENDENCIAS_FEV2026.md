@@ -26,6 +26,8 @@ Implementado e validado no repositório:
 - Conversor de fontes legado `~/news` -> DSL do backend com validação (`backend/convert_sources.py`)
 - Seed preserva múltiplos endpoints do mesmo domínio (ex.: notícias + agenda), evitando perda de cobertura editorial
 - Sync/upsert de fontes legado (`~/news`) no banco local deste servidor concluído
+- Dedupe por URL exata de endpoint no sync (clones históricos/aliases desativados)
+- Auditoria live de fontes (`backend/scripts/audit_sources_live.py`) com relatório local
 
 ## Validação local concluída
 
@@ -36,7 +38,13 @@ Executado com `.venv` local:
 - `.venv/bin/python backend/convert_sources.py --validate` ✅ (`~/news` convertido e validado: 150 fontes)
 - `DATABASE_URL=... .venv/bin/python -m app.seeds.seed_sources` ✅ sync executado no banco local
   - resultado: `inserted=146`, `updated=4`, `duplicates_disabled=2`
-  - cobertura: `0` fontes do `~/news` faltando no conjunto `enabled`
+  - cobertura: `0` URLs da curadoria `~/news` faltando no conjunto `enabled`
+- re-sync/normalização posterior ✅
+  - resultado: `updated=150`, `duplicate_endpoints_disabled=72`, `normalized_existing=72`
+  - banco final: `148` fontes `enabled`, `0` URLs duplicadas ativas
+- `.venv/bin/python backend/scripts/audit_sources_live.py --summary-only` ✅ (148 fontes)
+  - `141` com `2xx`, `6` com `4xx`, `1` timeout
+  - principais problemas atuais detectados: `DOU` (404), `TCU Acórdãos` (404), alguns `403`/bot block (`Fiocruz`, `Mercosul`)
 
 ## O que AINDA falta (realmente)
 
@@ -60,9 +68,11 @@ Executado com `.venv` local:
 
 3. Hardening em fontes reais (`SPA_HEADLESS` / `SPA_API` / `PDF`)
 - Falta:
-  - testar em fontes reais e ajustar contratos `metadata.spa_api_contract`, `metadata.spa_api_request`, `metadata.headless_capture`
+  - corrigir endpoints quebrados específicos detectados no live audit (ex.: `DOU`, `TCU Acórdãos`)
+  - ajustar contratos `metadata.spa_api_contract`, `metadata.spa_api_request`, `metadata.headless_capture` para fontes que exigirem customização
+  - tratar fontes com `403`/bot block (headers/estratégia/fallback) nos domínios problemáticos
 - Hoje:
-  - framework está implementado, mas calibração depende da fonte real
+  - framework está implementado, perfis foram normalizados, e existe auditoria live para medir erros por fonte
 
 ### 2. Pendências backend de produto (sem frontend)
 
@@ -118,6 +128,13 @@ cd /home/diego/pautanews/backend
 DATABASE_URL='postgresql+asyncpg://radar:radar_secret@localhost:5434/radar_news' \
 DATABASE_URL_SYNC='postgresql+psycopg://radar:radar_secret@localhost:5434/radar_news' \
 ../.venv/bin/python -m app.seeds.seed_sources
+```
+
+### Auditar fontes reais (status/content-type/sugestões)
+```bash
+cd /home/diego/pautanews
+.venv/bin/python backend/scripts/audit_sources_live.py --concurrency 20 --summary-only
+# relatório detalhado em artifacts/source_audit/latest.json
 ```
 
 ### Habilitar backlog real por RabbitMQ Management (se necessário)

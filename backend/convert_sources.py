@@ -29,6 +29,10 @@ def infer_strategy(stype: str | None, url: str | None) -> str:
     url_text = str(url or "").lower()
     if url_text.endswith(".pdf") or ".pdf?" in url_text:
         return "PDF"
+    if any(token in url_text for token in ("/api/", "/rest/", "api.", "/graphql")):
+        return "API"
+    if any(token in url_text for token in ("leitura-digital",)):
+        return "SPA_HEADLESS"
     return TYPE_MAP.get(str(stype or "").strip().lower(), "HTML")
 
 
@@ -68,7 +72,64 @@ def cadence_for_tier(tier: int) -> dict[str, int]:
 
 
 def endpoint_key_for_strategy(strategy: str) -> str:
-    return "feed" if strategy == "RSS" else "latest"
+    if strategy == "RSS":
+        return "feed"
+    if strategy in {"API", "SPA_API"}:
+        return "api"
+    return "latest"
+
+
+def _default_api_contract() -> dict[str, Any]:
+    return {
+        "items_path": "items",
+        "text_fields": ["text", "body", "content", "summary", "description"],
+        "title_fields": ["title", "headline", "name"],
+        "url_fields": ["url", "link", "href"],
+        "published_at_fields": ["published_at", "publishedAt", "date", "updated_at"],
+    }
+
+
+def apply_profile_overrides(
+    *,
+    source_id: str,
+    name: str,
+    domain: str,
+    url: str,
+    policy: dict[str, Any],
+) -> dict[str, Any]:
+    md = dict(policy.get("metadata") or {})
+    url_l = url.lower()
+    name_l = name.lower()
+
+    # Generic API hardening
+    if policy.get("strategy") == "API":
+        md.setdefault("api_contract", _default_api_contract())
+        # Some public APIs reject GET on search endpoints; preserve future override hook.
+        if "/graphql" in url_l:
+            md.setdefault("api_request", {"method": "POST", "json": {"query": ""}})
+
+    # Diário Oficial da União reading portal behaves like SPA and often needs render/XHR capture.
+    if source_id == "dou_oficial" or ("in.gov.br" in domain and "leitura-digital" in url_l):
+        policy["strategy"] = "SPA_HEADLESS"
+        policy["pool"] = "HEAVY_RENDER_POOL"
+        policy["endpoints"] = {"latest": url}
+        capture = md.get("headless_capture") if isinstance(md.get("headless_capture"), dict) else {}
+        capture.setdefault("url_contains", ["in.gov.br", "api", "json"])
+        md["headless_capture"] = capture
+        # DOU tends to be high-value but heavy; poll slightly less than RSS fast lanes.
+        cadence = dict(policy.get("cadence") or {})
+        cadence.setdefault("interval_seconds", 900)
+        policy["cadence"] = cadence
+
+    # TCU Acórdãos is a JSON endpoint (even if current path can drift).
+    if source_id == "tcu_acordaos" or ("apps.tcu.gov.br" in domain and "/rest/" in url_l):
+        policy["strategy"] = "API"
+        policy["pool"] = "FAST_POOL"
+        policy["endpoints"] = {"api": url}
+        md.setdefault("api_contract", _default_api_contract())
+
+    policy["metadata"] = md
+    return policy
 
 
 def convert_legacy_source_row(row: dict[str, Any]) -> dict[str, Any] | None:
@@ -119,6 +180,13 @@ def convert_legacy_source_row(row: dict[str, Any]) -> dict[str, Any] | None:
             "source_group": source_group,
         },
     }
+    policy = apply_profile_overrides(
+        source_id=source_id,
+        name=name,
+        domain=domain,
+        url=url,
+        policy=policy,
+    )
 
     return {
         "domain": domain,

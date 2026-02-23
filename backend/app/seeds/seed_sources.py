@@ -3,7 +3,7 @@
 Goals:
 - import all curated legacy sources
 - preserve multiple endpoints from the same domain
-- avoid exact duplicate crawlers (same source_id + endpoint)
+- avoid duplicate crawlers (exact endpoint URL), including legacy alias rows
 - keep SourceProfile DSL valid before persisting
 """
 from __future__ import annotations
@@ -20,6 +20,7 @@ from sqlalchemy import select
 
 from app.db import async_session_factory
 from app.models.source import Source
+from app.schemas.source_profile import SourceProfile
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -65,11 +66,52 @@ def _signature_from_policy(policy: dict[str, Any] | None) -> tuple[str, str]:
     return source_id, endpoint_url
 
 
+def _endpoint_url_from_policy(policy: dict[str, Any] | None) -> str:
+    return _signature_from_policy(policy)[1]
+
+
+def _profile_quality_score(src: Source, *, converted_signature_set: set[tuple[str, str]]) -> tuple[int, int, int]:
+    """Higher tuple wins.
+
+    Prioritize rows that match converted signatures from ~/news, then richer DSLs,
+    then cleaner source_id formatting.
+    """
+    policy = dict(src.fetch_policy_json or {})
+    sig = _signature_from_policy(policy)
+    score = 0
+    if sig in converted_signature_set:
+        score += 100
+    if policy.get("lang"):
+        score += 5
+    if policy.get("is_official") is True:
+        score += 5
+    if isinstance(policy.get("headers"), dict) and policy.get("headers"):
+        score += 5
+    if isinstance(policy.get("observability"), dict) and policy.get("observability"):
+        score += 5
+    if isinstance(policy.get("limits"), dict):
+        limits = policy.get("limits") or {}
+        score += min(len(limits), 4)
+    if isinstance(policy.get("metadata"), dict):
+        score += min(len(policy.get("metadata") or {}), 8)
+    source_id = str(policy.get("source_id") or "")
+    if source_id and "___" not in source_id:
+        score += 3
+    # Prefer enabled rows slightly, and newer rows (higher id) after quality tie.
+    return (
+        score + (1 if src.enabled else 0),
+        score,
+        int(src.id or 0),
+    )
+
+
 @dataclass
 class SyncStats:
     inserted: int = 0
     updated: int = 0
     duplicates_disabled: int = 0
+    duplicate_endpoints_disabled: int = 0
+    normalized_existing: int = 0
     skipped_invalid: int = 0
     legacy_total: int = 0
     converted_total: int = 0
@@ -79,10 +121,84 @@ class SyncStats:
             "inserted": self.inserted,
             "updated": self.updated,
             "duplicates_disabled": self.duplicates_disabled,
+            "duplicate_endpoints_disabled": self.duplicate_endpoints_disabled,
+            "normalized_existing": self.normalized_existing,
             "skipped_invalid": self.skipped_invalid,
             "legacy_total": self.legacy_total,
             "converted_total": self.converted_total,
         }
+
+
+def _enrich_existing_policy(src: Source, conv) -> tuple[dict[str, Any], bool]:
+    """Best-effort normalization of legacy/manual rows already stored in DB."""
+    policy = dict(src.fetch_policy_json or {})
+    original = dict(policy)
+    endpoints = policy.get("endpoints") if isinstance(policy.get("endpoints"), dict) else {}
+    endpoint_url = str(next(iter((endpoints or {}).values()), "") or "").strip()
+
+    source_id = str(policy.get("source_id") or "").strip() or conv.slugify_source_id(src.name)
+    source_domain = str(policy.get("source_domain") or "").strip() or str(src.domain or "")
+    strategy = str(policy.get("strategy") or "").strip() or conv.infer_strategy(None, endpoint_url)
+    pool = str(policy.get("pool") or "").strip() or conv.infer_pool(strategy)
+    endpoint_key = conv.endpoint_key_for_strategy(strategy)
+
+    # Re-map endpoint key only when endpoint exists and key is missing/incorrect for strategy.
+    if endpoint_url:
+        strategy_endpoints = dict(endpoints or {})
+        if endpoint_key not in strategy_endpoints or len(strategy_endpoints) != 1:
+            strategy_endpoints = {endpoint_key: endpoint_url}
+        endpoints = strategy_endpoints
+
+    policy["source_id"] = source_id
+    policy["source_domain"] = source_domain
+    policy["tier"] = int(src.tier or policy.get("tier") or 3)
+    policy["is_official"] = bool(src.is_official)
+    policy["lang"] = str(policy.get("lang") or getattr(src, "lang", "pt-BR") or "pt-BR")
+    policy["strategy"] = strategy
+    policy["pool"] = pool
+    if endpoints:
+        policy["endpoints"] = endpoints
+    policy.setdefault("headers", {"User-Agent": conv.INSTITUTIONAL_UA})
+    policy.setdefault("cadence", conv.cadence_for_tier(int(policy["tier"])))
+    policy.setdefault(
+        "limits",
+        {
+            "rate_limit_req_per_min": 10,
+            "concurrency_per_domain": 1,
+            "timeout_seconds": 30,
+            "max_bytes": 5_000_000,
+        },
+    )
+    policy.setdefault(
+        "observability",
+        {
+            "starvation_window_hours": 24,
+            "yield_keys": ["anchors_count", "evidence_score"],
+            "baseline_rolling": True,
+            "calendar_profile": "business_hours_br",
+        },
+    )
+    policy.setdefault("metadata", {})
+
+    policy = conv.apply_profile_overrides(
+        source_id=source_id,
+        name=str(src.name or ""),
+        domain=str(src.domain or ""),
+        url=endpoint_url,
+        policy=policy,
+    )
+
+    # Final pool correction if strategy changed by override.
+    expected_pool = conv.infer_pool(str(policy.get("strategy") or strategy))
+    if str(policy.get("pool") or "") not in {"FAST_POOL", "HEAVY_RENDER_POOL", "DEEP_EXTRACT_POOL"}:
+        policy["pool"] = expected_pool
+    elif str(policy.get("strategy")) in {"SPA_HEADLESS", "SPA_API", "PDF"}:
+        policy["pool"] = expected_pool
+
+    # Validate; if invalid due contract specifics, keep original row unchanged.
+    SourceProfile(**policy)
+    changed = policy != original
+    return policy, changed
 
 
 async def sync_sources(*, disable_exact_duplicates: bool = True) -> SyncStats:
@@ -92,6 +208,11 @@ async def sync_sources(*, disable_exact_duplicates: bool = True) -> SyncStats:
     legacy_rows = conv.load_legacy_sources(path)
     converted = conv.convert_legacy_sources(legacy_rows)
     stats = SyncStats(legacy_total=len(legacy_rows), converted_total=len(converted))
+    converted_signature_set = {
+        _signature_from_policy((item.get("fetch_policy_json") or {}))
+        for item in converted
+        if isinstance(item, dict)
+    }
 
     validation_errors = conv.validate_converted_profiles(converted)
     if validation_errors:
@@ -104,6 +225,17 @@ async def sync_sources(*, disable_exact_duplicates: bool = True) -> SyncStats:
     async with async_session_factory() as session:
         result = await session.execute(select(Source).order_by(Source.id.asc()))
         existing_rows = list(result.scalars().all())
+
+        # Normalize historical/manual rows to current DSL before dedupe/upsert.
+        for src in existing_rows:
+            try:
+                new_policy, changed = _enrich_existing_policy(src, conv)
+            except Exception as exc:
+                logger.warning("Skipping normalization for source id=%s (%s): %s", src.id, src.name, exc)
+                continue
+            if changed:
+                src.fetch_policy_json = new_policy
+                stats.normalized_existing += 1
 
         by_signature: dict[tuple[str, str], list[Source]] = {}
         for src in existing_rows:
@@ -160,6 +292,27 @@ async def sync_sources(*, disable_exact_duplicates: bool = True) -> SyncStats:
             by_signature.setdefault(sig, []).append(src)
             stats.inserted += 1
 
+        # Deduplicate by exact endpoint URL across legacy aliases (e.g., old source_id variants).
+        by_endpoint: dict[str, list[Source]] = {}
+        for src in existing_rows:
+            endpoint_url = _endpoint_url_from_policy(src.fetch_policy_json)
+            if endpoint_url:
+                by_endpoint.setdefault(endpoint_url, []).append(src)
+        for endpoint_url, rows in by_endpoint.items():
+            if len(rows) <= 1:
+                continue
+            keeper = sorted(
+                rows,
+                key=lambda s: _profile_quality_score(s, converted_signature_set=converted_signature_set),
+                reverse=True,
+            )[0]
+            for dup in rows:
+                if dup.id == keeper.id:
+                    continue
+                if dup.enabled:
+                    dup.enabled = False
+                    stats.duplicate_endpoints_disabled += 1
+
         await session.commit()
 
     logger.info("Source sync completed: %s", stats.as_dict())
@@ -197,4 +350,3 @@ if __name__ == "__main__":
     counts = _summarize_db_counts()
     if counts:
         logger.info("DB counts after sync: %s", counts)
-

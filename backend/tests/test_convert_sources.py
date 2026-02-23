@@ -44,6 +44,41 @@ def test_convert_legacy_source_row_pdf_uses_deep_pool() -> None:
     assert policy["pool"] == "DEEP_EXTRACT_POOL"
 
 
+def test_convert_legacy_source_row_api_like_url_uses_api_strategy() -> None:
+    item = conv.convert_legacy_source_row(
+        {
+            "name": "TCU - Acórdãos",
+            "type": "watch",
+            "url": "https://pesquisa.apps.tcu.gov.br/rest/publico/base/acordao/pesquisa",
+            "priority": "S0",
+            "editoria": "economia",
+        }
+    )
+    assert item is not None
+    policy = item["fetch_policy_json"]
+    assert policy["strategy"] == "API"
+    assert policy["pool"] == "FAST_POOL"
+    assert "api" in policy["endpoints"]
+    assert "api_contract" in policy["metadata"]
+
+
+def test_convert_legacy_source_row_dou_uses_spa_headless_override() -> None:
+    item = conv.convert_legacy_source_row(
+        {
+            "name": "Diário Oficial da União",
+            "type": "watch",
+            "url": "https://www.in.gov.br/leitura-digital",
+            "priority": "S0",
+            "editoria": "politica",
+        }
+    )
+    assert item is not None
+    policy = item["fetch_policy_json"]
+    assert policy["strategy"] == "SPA_HEADLESS"
+    assert policy["pool"] == "HEAVY_RENDER_POOL"
+    assert "headless_capture" in policy["metadata"]
+
+
 def test_convert_legacy_sources_preserves_same_domain_distinct_endpoints() -> None:
     converted = conv.convert_legacy_sources(
         [
