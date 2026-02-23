@@ -1,128 +1,200 @@
-"""Initial seed data for journalistic sources — Blueprint §6.
-Loads directly from legacy YAML for maximum fidelity.
+"""Sync seed data for journalistic sources from legacy ~/news (Blueprint §6).
+
+Goals:
+- import all curated legacy sources
+- preserve multiple endpoints from the same domain
+- avoid exact duplicate crawlers (same source_id + endpoint)
+- keep SourceProfile DSL valid before persisting
 """
+from __future__ import annotations
+
 import asyncio
+import importlib.util
 import logging
-import yaml
+from dataclasses import dataclass
 from pathlib import Path
-from urllib.parse import urlparse
-from sqlalchemy.ext.asyncio import AsyncSession
+from typing import Any
+
+import yaml
 from sqlalchemy import select
 
 from app.db import async_session_factory
 from app.models.source import Source
-from app.core.taxonomy import infer_source_class, infer_source_group
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 LEGACY_YAML_PATH = Path("/home/diego/news/bootstrap/config/sources.yaml")
 INTERNAL_YAML_PATH = Path("/app/sources_legacy.yaml")
-INSTITUTIONAL_UA = "RadarHardNews/1.0 (Institutional; newsroom monitoring)"
 
-async def seed_sources():
-    path = LEGACY_YAML_PATH if LEGACY_YAML_PATH.exists() else INTERNAL_YAML_PATH
-    if not path.exists():
-        logger.error(f"Legacy sources YAML not found at {LEGACY_YAML_PATH} nor {INTERNAL_YAML_PATH}")
-        return
 
-    with open(path, "r") as f:
-        data = yaml.safe_load(f)
-    
-    legacy_sources = data.get("sources", [])
-    logger.info(f"Found {len(legacy_sources)} sources in legacy YAML.")
+def _load_convert_module():
+    try:
+        import convert_sources  # type: ignore
 
-    priority_map = {"S0": 1, "S1": 2, "S2": 3}
-    type_map = {"rss": "RSS", "watch": "HTML"}
+        return convert_sources
+    except Exception:
+        # Fallback when running file directly and /app root is not in sys.path.
+        root = Path(__file__).resolve().parents[2]
+        script_path = root / "convert_sources.py"
+        spec = importlib.util.spec_from_file_location("convert_sources", script_path)
+        if not spec or not spec.loader:
+            raise RuntimeError(f"Cannot load convert_sources from {script_path}")
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+
+
+def _choose_legacy_path() -> Path:
+    if LEGACY_YAML_PATH.exists():
+        return LEGACY_YAML_PATH
+    if INTERNAL_YAML_PATH.exists():
+        return INTERNAL_YAML_PATH
+    raise FileNotFoundError(
+        f"Legacy sources YAML not found at {LEGACY_YAML_PATH} nor {INTERNAL_YAML_PATH}"
+    )
+
+
+def _signature_from_policy(policy: dict[str, Any] | None) -> tuple[str, str]:
+    data = dict(policy or {})
+    source_id = str(data.get("source_id") or "").strip()
+    endpoints = data.get("endpoints")
+    endpoint_url = ""
+    if isinstance(endpoints, dict):
+        endpoint_url = str(next(iter(endpoints.values()), "") or "").strip()
+    return source_id, endpoint_url
+
+
+@dataclass
+class SyncStats:
+    inserted: int = 0
+    updated: int = 0
+    duplicates_disabled: int = 0
+    skipped_invalid: int = 0
+    legacy_total: int = 0
+    converted_total: int = 0
+
+    def as_dict(self) -> dict[str, int]:
+        return {
+            "inserted": self.inserted,
+            "updated": self.updated,
+            "duplicates_disabled": self.duplicates_disabled,
+            "skipped_invalid": self.skipped_invalid,
+            "legacy_total": self.legacy_total,
+            "converted_total": self.converted_total,
+        }
+
+
+async def sync_sources(*, disable_exact_duplicates: bool = True) -> SyncStats:
+    conv = _load_convert_module()
+    path = _choose_legacy_path()
+
+    legacy_rows = conv.load_legacy_sources(path)
+    converted = conv.convert_legacy_sources(legacy_rows)
+    stats = SyncStats(legacy_total=len(legacy_rows), converted_total=len(converted))
+
+    validation_errors = conv.validate_converted_profiles(converted)
+    if validation_errors:
+        logger.error("Converted legacy sources failed SourceProfile validation (%s errors)", len(validation_errors))
+        for err in validation_errors[:20]:
+            logger.error(" - %s", err)
+        # Fail fast: do not persist invalid source profiles.
+        raise RuntimeError(f"SourceProfile validation failed for {len(validation_errors)} converted sources")
 
     async with async_session_factory() as session:
-        # Check existing sources to avoid duplicate endpoint rows while preserving
-        # multiple useful endpoints per same domain (agenda/noticias/comunicados).
-        stmt = select(Source)
-        result = await session.execute(stmt)
-        existing_sources = result.scalars().all()
-        existing_source_ids: set[str] = set()
-        existing_endpoint_urls: set[str] = set()
-        for src in existing_sources:
-            try:
-                policy = dict(src.fetch_policy_json or {})
-            except Exception:
-                policy = {}
-            sid = str(policy.get("source_id") or "").strip()
-            if sid:
-                existing_source_ids.add(sid)
-            endpoints = policy.get("endpoints") if isinstance(policy.get("endpoints"), dict) else {}
-            for endpoint_url in (endpoints or {}).values():
-                if endpoint_url:
-                    existing_endpoint_urls.add(str(endpoint_url).strip())
+        result = await session.execute(select(Source).order_by(Source.id.asc()))
+        existing_rows = list(result.scalars().all())
 
-        new_sources_count = 0
-        for s in legacy_sources:
-            name = s.get("name")
-            url = s.get("url")
-            stype = s.get("type")
-            editoria = s.get("editoria")
-            priority = s.get("priority", "S2")
-            
-            domain = urlparse(url).hostname or "unknown" if url else "unknown"
-            tier = priority_map.get(priority, 3)
-            strategy = type_map.get(stype, "HTML")
-            source_id = name.lower().replace(" ", "_").replace("-", "_").replace(".", "_")
-            endpoint_key = "feed" if strategy == "RSS" else "latest"
-            endpoint_url = str(url).strip()
-            if source_id in existing_source_ids or endpoint_url in existing_endpoint_urls:
+        by_signature: dict[tuple[str, str], list[Source]] = {}
+        for src in existing_rows:
+            sig = _signature_from_policy(src.fetch_policy_json)
+            by_signature.setdefault(sig, []).append(src)
+
+        if disable_exact_duplicates:
+            for sig, rows in by_signature.items():
+                if not sig[0] or not sig[1] or len(rows) <= 1:
+                    continue
+                keeper = rows[0]
+                for dup in rows[1:]:
+                    if dup.enabled:
+                        dup.enabled = False
+                        stats.duplicates_disabled += 1
+                # Keep first row enabled unless user manually disabled it.
+                logger.debug("Deduped sources signature %s keeping id=%s", sig, keeper.id)
+
+        # Refresh signature index after duplicate normalization.
+        by_signature = {}
+        for src in existing_rows:
+            sig = _signature_from_policy(src.fetch_policy_json)
+            by_signature.setdefault(sig, []).append(src)
+
+        for item in converted:
+            policy = item.get("fetch_policy_json") or {}
+            sig = _signature_from_policy(policy)
+            if not sig[0] or not sig[1]:
+                stats.skipped_invalid += 1
                 continue
-            
-            # Use taxonomy to infer class and group
-            s_class = infer_source_class(name, url)
-            s_group = infer_source_group(name, url, s_class)
 
-            policy = {
-                "source_id": source_id,
-                "source_domain": domain,
-                "tier": tier,
-                "is_official": bool(".gov.br" in domain or ".leg.br" in domain or ".jus.br" in domain or s_class == "primary"),
-                "lang": "pt-BR",
-                "pool": "FAST_POOL",
-                "strategy": strategy,
-                "endpoints": {endpoint_key: endpoint_url},
-                "headers": {"User-Agent": INSTITUTIONAL_UA},
-                "cadence": {"interval_seconds": 600 if tier == 1 else 1800 if tier == 2 else 3600},
-                "limits": {"rate_limit_req_per_min": 10},
-                "observability": {
-                    "starvation_window_hours": 24,
-                    "yield_keys": ["anchors_count", "evidence_score"],
-                    "baseline_rolling": True,
-                    "calendar_profile": "business_hours_br",
-                },
-                "metadata": {
-                    "legacy_editoria": editoria,
-                    "source_class": s_class,
-                    "source_group": s_group
-                }
-            }
-            
-            source = Source(
-                domain=domain,
-                name=name,
-                tier=tier,
-                is_official=bool(policy["is_official"]),
-                fetch_policy_json=policy
+            existing = by_signature.get(sig, [])
+            if existing:
+                src = existing[0]
+                src.domain = str(item.get("domain") or src.domain)
+                src.name = str(item.get("name") or src.name)
+                src.tier = int(item.get("tier") or src.tier)
+                src.is_official = bool(item.get("is_official"))
+                # Keep existing enabled flag if user disabled manually.
+                src.fetch_policy_json = policy
+                stats.updated += 1
+                continue
+
+            src = Source(
+                domain=str(item["domain"]),
+                name=str(item["name"]),
+                tier=int(item["tier"]),
+                is_official=bool(item["is_official"]),
+                fetch_policy_json=policy,
+                enabled=True,
             )
-            session.add(source)
-            existing_source_ids.add(source_id)
-            existing_endpoint_urls.add(endpoint_url)
-            new_sources_count += 1
+            session.add(src)
+            existing_rows.append(src)
+            by_signature.setdefault(sig, []).append(src)
+            stats.inserted += 1
 
-        if new_sources_count > 0:
-            try:
-                await session.commit()
-                logger.info(f"Seeded {new_sources_count} new sources successfully.")
-            except Exception as e:
-                await session.rollback()
-                logger.error(f"Error seeding sources: {e}")
-        else:
-            logger.info("No new sources to seed.")
+        await session.commit()
+
+    logger.info("Source sync completed: %s", stats.as_dict())
+    return stats
+
+
+async def seed_sources():
+    """Backward-compatible entrypoint used elsewhere in the repo."""
+    return await sync_sources()
+
+
+def _summarize_db_counts() -> dict[str, int]:
+    # Lightweight sync summary helper for CLI logging; executed sync-style via psycopg if available.
+    try:
+        import psycopg  # type: ignore
+        from app.config import settings
+
+        dsn = str(getattr(settings, "DATABASE_URL_SYNC", "") or "")
+        if not dsn:
+            return {}
+        with psycopg.connect(dsn) as conn:
+            with conn.cursor() as cur:
+                cur.execute("select count(*) from sources")
+                total = int(cur.fetchone()[0])
+                cur.execute("select count(distinct domain) from sources")
+                distinct_domains = int(cur.fetchone()[0])
+                return {"sources_total": total, "distinct_domains": distinct_domains}
+    except Exception:
+        return {}
+
 
 if __name__ == "__main__":
-    asyncio.run(seed_sources())
+    stats = asyncio.run(sync_sources())
+    logger.info("Seed/sync stats: %s", stats.as_dict())
+    counts = _summarize_db_counts()
+    if counts:
+        logger.info("DB counts after sync: %s", counts)
+

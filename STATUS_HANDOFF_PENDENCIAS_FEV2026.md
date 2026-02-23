@@ -25,6 +25,7 @@ Implementado e validado no repositório:
 - Validação forte do `SourceProfile` (strategy/pool/cadence/endpoints/metadata)
 - Conversor de fontes legado `~/news` -> DSL do backend com validação (`backend/convert_sources.py`)
 - Seed preserva múltiplos endpoints do mesmo domínio (ex.: notícias + agenda), evitando perda de cobertura editorial
+- Sync/upsert de fontes legado (`~/news`) no banco local deste servidor concluído
 
 ## Validação local concluída
 
@@ -33,6 +34,9 @@ Executado com `.venv` local:
 - `.venv/bin/python -m pytest -q backend/tests` ✅ `42 passed`
 - `.venv/bin/python backend/scripts/replay_backtest_gate.py` ✅ `pass` (fallback fixture local com cenários crise/normal/marasmo)
 - `.venv/bin/python backend/convert_sources.py --validate` ✅ (`~/news` convertido e validado: 150 fontes)
+- `DATABASE_URL=... .venv/bin/python -m app.seeds.seed_sources` ✅ sync executado no banco local
+  - resultado: `inserted=146`, `updated=4`, `duplicates_disabled=2`
+  - cobertura: `0` fontes do `~/news` faltando no conjunto `enabled`
 
 ## O que AINDA falta (realmente)
 
@@ -106,6 +110,14 @@ python3 -m compileall -q backend/app backend/tests backend/scripts
 ### Subir stack (compose)
 ```bash
 docker compose up -d postgres rabbitmq redis api celery-fast celery-heavy celery-deep celery-ops celery-beat
+```
+
+### Sincronizar fontes curadas do `~/news` para o banco local (host)
+```bash
+cd /home/diego/pautanews/backend
+DATABASE_URL='postgresql+asyncpg://radar:radar_secret@localhost:5434/radar_news' \
+DATABASE_URL_SYNC='postgresql+psycopg://radar:radar_secret@localhost:5434/radar_news' \
+../.venv/bin/python -m app.seeds.seed_sources
 ```
 
 ### Habilitar backlog real por RabbitMQ Management (se necessário)
