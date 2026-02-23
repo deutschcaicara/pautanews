@@ -27,6 +27,7 @@ logger = logging.getLogger(__name__)
 
 LEGACY_YAML_PATH = Path("/home/diego/news/bootstrap/config/sources.yaml")
 INTERNAL_YAML_PATH = Path("/app/sources_legacy.yaml")
+MVP_DEFERRED_SOURCE_IDS = {"dou_oficial", "tcu_acordaos"}
 
 
 def _load_convert_module():
@@ -68,6 +69,10 @@ def _signature_from_policy(policy: dict[str, Any] | None) -> tuple[str, str]:
 
 def _endpoint_url_from_policy(policy: dict[str, Any] | None) -> str:
     return _signature_from_policy(policy)[1]
+
+
+def _source_id_from_policy(policy: dict[str, Any] | None) -> str:
+    return _signature_from_policy(policy)[0]
 
 
 def _profile_quality_score(src: Source, *, converted_signature_set: set[tuple[str, str]]) -> tuple[int, int, int]:
@@ -233,6 +238,8 @@ async def sync_sources(*, disable_exact_duplicates: bool = True) -> SyncStats:
             except Exception as exc:
                 logger.warning("Skipping normalization for source id=%s (%s): %s", src.id, src.name, exc)
                 continue
+            if _source_id_from_policy(new_policy) in MVP_DEFERRED_SOURCE_IDS and src.enabled:
+                src.enabled = False
             if changed:
                 src.fetch_policy_json = new_policy
                 stats.normalized_existing += 1
@@ -274,7 +281,9 @@ async def sync_sources(*, disable_exact_duplicates: bool = True) -> SyncStats:
                 src.name = str(item.get("name") or src.name)
                 src.tier = int(item.get("tier") or src.tier)
                 src.is_official = bool(item.get("is_official"))
-                # Keep existing enabled flag if user disabled manually.
+                # Respect MVP deferrals; otherwise keep manual enabled/disabled decisions.
+                if _source_id_from_policy(policy) in MVP_DEFERRED_SOURCE_IDS:
+                    src.enabled = False
                 src.fetch_policy_json = policy
                 stats.updated += 1
                 continue
@@ -285,7 +294,7 @@ async def sync_sources(*, disable_exact_duplicates: bool = True) -> SyncStats:
                 tier=int(item["tier"]),
                 is_official=bool(item["is_official"]),
                 fetch_policy_json=policy,
-                enabled=True,
+                enabled=_source_id_from_policy(policy) not in MVP_DEFERRED_SOURCE_IDS,
             )
             session.add(src)
             existing_rows.append(src)

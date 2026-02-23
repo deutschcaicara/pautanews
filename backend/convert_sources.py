@@ -120,6 +120,7 @@ def apply_profile_overrides(
         cadence = dict(policy.get("cadence") or {})
         cadence.setdefault("interval_seconds", 900)
         policy["cadence"] = cadence
+        md["mvp_deferred"] = True
 
     # TCU Acórdãos is a JSON endpoint (even if current path can drift).
     if source_id == "tcu_acordaos" or ("apps.tcu.gov.br" in domain and "/rest/" in url_l):
@@ -127,6 +128,45 @@ def apply_profile_overrides(
         policy["pool"] = "FAST_POOL"
         policy["endpoints"] = {"api": url}
         md.setdefault("api_contract", _default_api_contract())
+        md["mvp_deferred"] = True
+
+    # Mercosul often presents bot challenge to plain HTTP clients; headless runtime works.
+    if "mercosur.int" in domain:
+        policy["strategy"] = "SPA_HEADLESS"
+        policy["pool"] = "HEAVY_RENDER_POOL"
+        capture = md.get("headless_capture") if isinstance(md.get("headless_capture"), dict) else {}
+        capture.setdefault("url_contains", ["mercosur", "wp-json", "api"])
+        md["headless_capture"] = capture
+
+    # MapBiomas endpoint redirects to brasil.mapbiomas.org and can timeout under short connect windows.
+    if source_id == "mapbiomas_destaques" or "mapbiomas.org/destaques" in url_l:
+        final_url = "https://brasil.mapbiomas.org/destaques/"
+        policy["endpoints"] = {"latest": final_url}
+        policy["source_domain"] = urlparse(final_url).hostname or domain
+        limits = dict(policy.get("limits") or {})
+        limits["timeout_seconds"] = max(int(limits.get("timeout_seconds") or 30), 45)
+        policy["limits"] = limits
+
+    # Fiocruz main portal blocks direct crawling; use Agência Fiocruz endpoints that are accessible.
+    if "fiocruz.br" in domain and ("agencia.fiocruz.br" not in domain):
+        if "rss" in name_l:
+            target_url = "https://agencia.fiocruz.br/rss.xml"
+            policy["strategy"] = "RSS"
+            policy["pool"] = "FAST_POOL"
+            policy["endpoints"] = {"feed": target_url}
+        elif "pesquisa" in name_l:
+            target_url = "https://agencia.fiocruz.br/busca-geral?search_api_fulltext=pesquisa"
+            policy["strategy"] = "HTML"
+            policy["pool"] = "FAST_POOL"
+            policy["endpoints"] = {"latest": target_url}
+            md.setdefault("fiocruz_agency_fallback", "search:p esquisa".replace(" ", ""))
+        else:
+            target_url = "https://agencia.fiocruz.br/"
+            policy["strategy"] = "HTML"
+            policy["pool"] = "FAST_POOL"
+            policy["endpoints"] = {"latest": target_url}
+            md.setdefault("fiocruz_agency_fallback", "homepage")
+        policy["source_domain"] = "agencia.fiocruz.br"
 
     policy["metadata"] = md
     return policy
@@ -188,8 +228,12 @@ def convert_legacy_source_row(row: dict[str, Any]) -> dict[str, Any] | None:
         policy=policy,
     )
 
+    final_endpoints = policy.get("endpoints") if isinstance(policy.get("endpoints"), dict) else {}
+    final_url = str(next(iter((final_endpoints or {}).values()), url) or url)
+    final_domain = str(policy.get("source_domain") or (urlparse(final_url).hostname or domain)).lower()
+
     return {
-        "domain": domain,
+        "domain": final_domain,
         "name": name,
         "tier": tier,
         "is_official": is_official,

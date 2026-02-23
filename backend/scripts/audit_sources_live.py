@@ -73,6 +73,13 @@ def _suggestions(policy: dict[str, Any], result: dict[str, Any]) -> list[str]:
 
     if status in {404, 410}:
         suggestions.append("BROKEN_ENDPOINT_404")
+    if (
+        strategy == "SPA_HEADLESS"
+        and status == 403
+        and not result.get("error_class")
+    ):
+        suggestions.append("HTTPX_PROBE_LIMITATION_SPA_HEADLESS")
+        return suggestions
     if status == 401:
         suggestions.append("AUTH_REQUIRED_OR_BLOCKED")
     if status == 403:
@@ -204,18 +211,23 @@ def _build_summary(results: list[dict[str, Any]], dup_counts: dict[str, int]) ->
     suggestion_counts: Counter[str] = Counter()
     invalid_profiles = 0
     duplicate_url_active = 0
+    probe_limitations = 0
 
     for r in results:
         code = r.get("status_code")
+        suggestions = set(r.get("suggestions") or [])
+        is_probe_limited = "HTTPX_PROBE_LIMITATION_SPA_HEADLESS" in suggestions
+        if is_probe_limited:
+            probe_limitations += 1
         if code is None:
             by_status_class["error"] += 1
-        else:
+        elif not is_probe_limited:
             by_status_code[str(code)] += 1
             by_status_class[f"{int(code)//100}xx"] += 1
         fam = str(r.get("content_family") or "unknown")
         by_content_family[fam] += 1
         by_strategy[str(r.get("strategy") or "unknown")] += 1
-        for s in r.get("suggestions") or []:
+        for s in suggestions:
             suggestion_counts[str(s)] += 1
         if r.get("invalid_profile"):
             invalid_profiles += 1
@@ -238,6 +250,7 @@ def _build_summary(results: list[dict[str, Any]], dup_counts: dict[str, int]) ->
         "suggestion_counts": dict(suggestion_counts),
         "duplicate_url_active": duplicate_url_active,
         "invalid_profiles": invalid_profiles,
+        "probe_limitations": probe_limitations,
         "top_issues": top_issues,
     }
 
@@ -294,4 +307,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

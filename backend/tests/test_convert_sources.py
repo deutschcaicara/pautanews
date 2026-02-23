@@ -79,6 +79,70 @@ def test_convert_legacy_source_row_dou_uses_spa_headless_override() -> None:
     assert "headless_capture" in policy["metadata"]
 
 
+def test_convert_legacy_source_row_mercosur_uses_spa_headless_override() -> None:
+    item = conv.convert_legacy_source_row(
+        {
+            "name": "Mercosul - Noticias",
+            "type": "watch",
+            "url": "https://www.mercosur.int/",
+            "priority": "S2",
+            "editoria": "internacional",
+        }
+    )
+    assert item is not None
+    policy = item["fetch_policy_json"]
+    assert policy["strategy"] == "SPA_HEADLESS"
+    assert policy["pool"] == "HEAVY_RENDER_POOL"
+
+
+def test_convert_legacy_source_row_fiocruz_switches_to_agencia_endpoints() -> None:
+    rss_item = conv.convert_legacy_source_row(
+        {
+            "name": "Fiocruz - RSS",
+            "type": "watch",
+            "url": "https://fiocruz.br/rss.xml",
+            "priority": "S1",
+            "editoria": "saude",
+        }
+    )
+    assert rss_item is not None
+    rss_policy = rss_item["fetch_policy_json"]
+    assert rss_item["domain"] == "agencia.fiocruz.br"
+    assert rss_policy["endpoints"]["feed"] == "https://agencia.fiocruz.br/rss.xml"
+    assert rss_policy["strategy"] == "RSS"
+
+    pesquisa_item = conv.convert_legacy_source_row(
+        {
+            "name": "FIOCRUZ - Pesquisa",
+            "type": "watch",
+            "url": "https://portal.fiocruz.br/pesquisa-e-inovacao",
+            "priority": "S1",
+            "editoria": "ciencia",
+        }
+    )
+    assert pesquisa_item is not None
+    p = pesquisa_item["fetch_policy_json"]
+    assert pesquisa_item["domain"] == "agencia.fiocruz.br"
+    assert "busca-geral?search_api_fulltext=pesquisa" in p["endpoints"]["latest"]
+
+
+def test_convert_legacy_source_row_mapbiomas_normalizes_final_url_and_timeout() -> None:
+    item = conv.convert_legacy_source_row(
+        {
+            "name": "MapBiomas - Destaques",
+            "type": "watch",
+            "url": "https://mapbiomas.org/destaques",
+            "priority": "S1",
+            "editoria": "meio_ambiente",
+        }
+    )
+    assert item is not None
+    p = item["fetch_policy_json"]
+    assert item["domain"] == "brasil.mapbiomas.org"
+    assert p["endpoints"]["latest"] == "https://brasil.mapbiomas.org/destaques/"
+    assert p["limits"]["timeout_seconds"] >= 45
+
+
 def test_convert_legacy_sources_preserves_same_domain_distinct_endpoints() -> None:
     converted = conv.convert_legacy_sources(
         [

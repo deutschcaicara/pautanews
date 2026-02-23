@@ -28,12 +28,17 @@ Implementado e validado no repositório:
 - Sync/upsert de fontes legado (`~/news`) no banco local deste servidor concluído
 - Dedupe por URL exata de endpoint no sync (clones históricos/aliases desativados)
 - Auditoria live de fontes (`backend/scripts/audit_sources_live.py`) com relatório local
+- Overrides de fonte reais aplicados no backend (MVP):
+  - `Fiocruz*` -> `agencia.fiocruz.br` (RSS/home/busca)
+  - `Mercosul` -> `SPA_HEADLESS`
+  - `MapBiomas` -> URL final `brasil.mapbiomas.org` + timeout maior
 
 ## Validação local concluída
 
 Executado com `.venv` local:
 - `python3 -m compileall -q backend/app backend/tests backend/scripts` ✅
 - `.venv/bin/python -m pytest -q backend/tests` ✅ `42 passed`
+- `.venv/bin/python -m pytest -q backend/tests` ✅ `47 passed`
 - `.venv/bin/python backend/scripts/replay_backtest_gate.py` ✅ `pass` (fallback fixture local com cenários crise/normal/marasmo)
 - `.venv/bin/python backend/convert_sources.py --validate` ✅ (`~/news` convertido e validado: 150 fontes)
 - `DATABASE_URL=... .venv/bin/python -m app.seeds.seed_sources` ✅ sync executado no banco local
@@ -42,9 +47,16 @@ Executado com `.venv` local:
 - re-sync/normalização posterior ✅
   - resultado: `updated=150`, `duplicate_endpoints_disabled=72`, `normalized_existing=72`
   - banco final: `148` fontes `enabled`, `0` URLs duplicadas ativas
+- re-sync final de hardening MVP ✅
+  - `DOU` e `TCU Acórdãos` marcados como `mvp_deferred` e desabilitados no conjunto ativo
+  - banco final (MVP ativo): `145` fontes `enabled`
 - `.venv/bin/python backend/scripts/audit_sources_live.py --summary-only` ✅ (148 fontes)
-  - `141` com `2xx`, `6` com `4xx`, `1` timeout
-  - principais problemas atuais detectados: `DOU` (404), `TCU Acórdãos` (404), alguns `403`/bot block (`Fiocruz`, `Mercosul`)
+  - após hardening + defer pós-MVP:
+    - `145` fontes ativas auditadas
+    - `144` com `2xx`
+    - `0` `4xx` no conjunto MVP ativo
+    - `1` limitação de probe (`Mercosul` em `SPA_HEADLESS`, `httpx` mostra `403`, runtime headless funciona)
+- decisão de escopo (2026-02-23): `DOU` e `TCU Acórdãos` ficam para **pós-MVP** (não bloqueiam fechamento do MVP)
 
 ## O que AINDA falta (realmente)
 
@@ -68,11 +80,13 @@ Executado com `.venv` local:
 
 3. Hardening em fontes reais (`SPA_HEADLESS` / `SPA_API` / `PDF`)
 - Falta:
-  - corrigir endpoints quebrados específicos detectados no live audit (ex.: `DOU`, `TCU Acórdãos`)
+  - corrigir endpoints quebrados específicos detectados no live audit (exceto itens explicitamente pós-MVP, como `DOU` e `TCU Acórdãos`)
   - ajustar contratos `metadata.spa_api_contract`, `metadata.spa_api_request`, `metadata.headless_capture` para fontes que exigirem customização
-  - tratar fontes com `403`/bot block (headers/estratégia/fallback) nos domínios problemáticos
+  - (baixo impacto) melhorar probe de auditoria para testar `SPA_HEADLESS` com browser de fato, não `httpx`
 - Hoje:
   - framework está implementado, perfis foram normalizados, e existe auditoria live para medir erros por fonte
+  - `DOU` / `TCU Acórdãos` estão mapeados como pendência pós-MVP por decisão de escopo
+  - fontes bloqueadas no MVP foram mitigadas (`Fiocruz`, `MapBiomas`, `Mercosul`)
 
 ### 2. Pendências backend de produto (sem frontend)
 
