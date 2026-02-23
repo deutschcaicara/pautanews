@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="pt-PT" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Radar de Pautas | Terminal da Redação</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'Fira Code', 'monospace'],
+                    },
+                    colors: {
+                        brand: { 500: '#2563eb', 400: '#3b82f6', 900: '#1e3a8a' },
+                        dark: { 900: '#09090b', 800: '#18181b', 700: '#27272a', 600: '#3f3f46' }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        ::-webkit-scrollbar { width: 4px; height: 4px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 2px; }
+        ::-webkit-scrollbar-thumb:hover { background: #52525b; }
+        
+        /* Efeito de flash amarelo para atualizações in-place */
+        @keyframes flash-update {
+            0% { background-color: rgba(234, 179, 8, 0.2); }
+            100% { background-color: transparent; }
+        }
+        .flash-updated { animation: flash-update 2s ease-out; }
+    </style>
+</head>
+<body class="flex h-screen w-full bg-dark-900 text-slate-300 font-sans overflow-hidden text-[13px] antialiased">
+
+    <!-- 1. BARRA LATERAL ESQUERDA (Navegação Global) - 220px -->
+    <aside class="w-[220px] bg-dark-900 border-r border-dark-700 flex flex-col shrink-0 z-20">
+        <!-- Logotipo e Área do Utilizador -->
+        <div class="h-14 flex items-center px-4 border-b border-dark-700 bg-dark-800">
+            <div class="flex items-center gap-2 text-slate-100 font-bold tracking-wide">
+                <i class="fa-solid fa-satellite-dish text-brand-500"></i>
+                <span class="text-[14px]">RADAR.NEWS</span>
+            </div>
+        </div>
+
+        <!-- Vias de Apuração -->
+        <div class="p-3">
+            <div class="text-[10px] font-bold text-slate-500 mb-2 uppercase tracking-wider px-2">Fluxos de Trabalho</div>
+            <nav class="space-y-0.5" id="nav-vias">
+                <!-- Preenchido via JS -->
+            </nav>
+        </div>
+
+        <!-- Filtros Rápidos Investigativos -->
+        <div class="p-3 border-t border-dark-700 flex-1 overflow-y-auto">
+            <div class="text-[10px] font-bold text-slate-500 mb-3 uppercase tracking-wider px-2">Filtros Investigativos</div>
+            
+            <div class="space-y-4 px-2">
+                <!-- Órgãos -->
+                <div>
+                    <h4 class="text-[11px] font-medium text-slate-400 mb-2 flex items-center gap-1.5"><i class="fa-solid fa-building text-slate-500"></i> Fontes Oficiais</h4>
+                    <div class="space-y-1.5 flex flex-col">
+                        <label class="flex items-center gap-2 hover:text-white cursor-pointer group">
+                            <input type="checkbox" class="rounded bg-dark-800 border-dark-600 text-brand-500 focus:ring-0 w-3.5 h-3.5">
+                            <span class="text-xs group-hover:text-slate-200">Diários Oficiais (DOU)</span>
+                        </label>
+                        <label class="flex items-center gap-2 hover:text-white cursor-pointer group">
+                            <input type="checkbox" class="rounded bg-dark-800 border-dark-600 text-brand-500 focus:ring-0 w-3.5 h-3.5">
+                            <span class="text-xs group-hover:text-slate-200">Tribunais de Contas (TCU)</span>
+                        </label>
+                        <label class="flex items-center gap-2 hover:text-white cursor-pointer group">
+                            <input type="checkbox" class="rounded bg-dark-800 border-dark-600 text-brand-500 focus:ring-0 w-3.5 h-3.5">
+                            <span class="text-xs group-hover:text-slate-200">Supremo (STF/TSE)</span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Inteligência -->
+                <div>
+                    <h4 class="text-[11px] font-medium text-emerald-500 mb-2 flex items-center gap-1.5"><i class="fa-solid fa-filter text-emerald-600"></i> Ocultar Ruído</h4>
+                    <div class="space-y-1.5 flex flex-col">
+                        <label class="flex items-center gap-2 hover:text-white cursor-pointer group">
+                            <input type="checkbox" checked class="rounded bg-dark-800 border-emerald-900 text-emerald-500 focus:ring-0 w-3.5 h-3.5">
+                            <span class="text-xs text-emerald-400 font-medium">Furos Exclusivos (Sem Globo/Folha)</span>
+                        </label>
+                        <label class="flex items-center gap-2 hover:text-white cursor-pointer group">
+                            <input type="checkbox" checked class="rounded bg-dark-800 border-dark-600 text-brand-500 focus:ring-0 w-3.5 h-3.5">
+                            <span class="text-xs">Apenas com Anexo/PDF</span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- User / Configs -->
+        <div class="p-3 border-t border-dark-700 bg-dark-800 flex justify-between items-center">
+            <div class="flex items-center gap-2">
+                <div class="w-6 h-6 rounded-full bg-brand-900 text-brand-400 flex items-center justify-center font-bold text-[10px]">DF</div>
+                <span class="text-xs font-medium text-slate-300">Diego Feijó</span>
+            </div>
+            <i class="fa-solid fa-gear text-slate-500 hover:text-white cursor-pointer"></i>
+        </div>
+    </aside>
+
+    <!-- 2. PAINEL CENTRAL (O FEED DE TRIAGEM) - Largura Flexível ou Fixa (ex: 450px) -->
+    <main class="w-[450px] border-r border-dark-700 flex flex-col bg-dark-900 relative shrink-0">
+        
+        <!-- Top Bar do Feed (Pesquisa + Ações Globais) -->
+        <div class="h-14 border-b border-dark-700 bg-dark-900 flex items-center justify-between px-3 gap-2">
+            <div class="relative flex-1">
+                <i class="fa-solid fa-magnifying-glass absolute left-2.5 top-2 text-slate-500 text-xs"></i>
+                <input type="text" placeholder="Buscar pautas (Cmd+K)" class="w-full bg-dark-800 border border-dark-700 rounded-md py-1.5 pl-8 pr-3 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500">
+            </div>
+            <div class="flex items-center gap-1">
+                <!-- Toggle Densidade (Crucial para alto volume) -->
+                <button id="btn-density" class="w-7 h-7 flex items-center justify-center rounded bg-dark-800 border border-dark-700 text-slate-400 hover:text-white hover:bg-dark-700" title="Alternar Densidade (Lista Densa vs Cards)">
+                    <i class="fa-solid fa-list"></i>
+                </button>
+                <button id="btn-freeze" class="w-7 h-7 flex items-center justify-center rounded bg-dark-800 border border-dark-700 text-slate-400 hover:text-white hover:bg-dark-700" title="Pausar Feed (Espaço)">
+                    <i class="fa-solid fa-pause"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- As Editorias (Cadernos) - Respondendo à sua crítica -->
+        <div class="border-b border-dark-700 bg-dark-800 px-2 overflow-x-auto whitespace-nowrap hide-scrollbar flex items-center">
+            <button class="px-3 py-2.5 text-[11px] font-bold text-white border-b-2 border-brand-500">TODAS</button>
+            <button class="px-3 py-2.5 text-[11px] font-medium text-slate-400 hover:text-slate-200 border-b-2 border-transparent hover:border-dark-600">POLÍTICA</button>
+            <button class="px-3 py-2.5 text-[11px] font-medium text-slate-400 hover:text-slate-200 border-b-2 border-transparent hover:border-dark-600">ECONOMIA</button>
+            <button class="px-3 py-2.5 text-[11px] font-medium text-slate-400 hover:text-slate-200 border-b-2 border-transparent hover:border-dark-600">JUSTIÇA (STF)</button>
+            <button class="px-3 py-2.5 text-[11px] font-medium text-slate-400 hover:text-slate-200 border-b-2 border-transparent hover:border-dark-600">POLÍCIA/PF</button>
+        </div>
+
+        <!-- Pilula Anti-Jump -->
+        <div id="anti-jump-pill" class="hidden absolute top-28 left-0 right-0 flex justify-center z-30 pointer-events-none">
+            <button class="pointer-events-auto bg-brand-600 hover:bg-brand-500 text-white text-[11px] font-bold py-1.5 px-4 rounded-full shadow-[0_4px_12px_rgba(37,99,235,0.3)] flex items-center gap-2 border border-brand-400">
+                <i class="fa-solid fa-arrow-up"></i> 5 Matérias Novas
+            </button>
+        </div>
+
+        <!-- Container do Feed -->
+        <!-- NOTA: Em modo compacto, os itens perdem padding e descrição, focando só na manchete -->
+        <div id="feed-container" class="flex-1 overflow-y-auto bg-dark-900 relative">
+            <!-- Renderizado via JS -->
+        </div>
+    </main>
+
+    <!-- 3. PAINEL DIREITO (A MESA DE APURAÇÃO / DOSSIÊ) - Flexível (ocupa o resto da tela) -->
+    <div class="flex-1 flex flex-col bg-[#0d121c] relative z-10" id="dossie-container">
+        <!-- Renderizado via JS -->
+    </div>
+
+    <!-- SCRIPT PRINCIPAL -->
+    <script>
+        // --- 1. DADOS DE TESTE (Orientados a Editorias e Fatos Densos) ---
+        const MOCK_EVENTS = [
+            {
+                id: 'e1', via: 'plantao', status: 'HOT', editoria: 'POLÍCIA', score: 98,
+                headline: 'PF cumpre mandados no Ministério da Saúde em operação sobre contratos de TI',
+                timeAgo: '10:45',
+                tags: ['Operação PF', 'Corrupção'], sources: ['G1', 'Folha', 'Estadão'],
+                reasons: ['Alta velocidade: 12 docs/min', 'Confirmação Múltipla Tier-1'],
+                summary: 'A Polícia Federal deflagrou a Operação "Byte Marcado" investigando sobrepreço de 300% em licitações de software para hospitais federais. 15 mandados em Brasília e SP.',
+                evidence: null,
+                deltas: [],
+                timeline: [
+                    { time: '10:30', source: 'Twitter', text: 'Jornalistas locais relatam viaturas na Esplanada.' },
+                    { time: '10:42', source: 'G1', text: 'Nota de plantão confirma operação na Saúde.' },
+                    { time: '10:45', source: 'Folha', text: 'Atualização adiciona o nome da operação (Byte Marcado).' }
+                ]
+            },
+            {
+                id: 'e2', via: 'plantao', status: 'UNVERIFIED_VIRAL', editoria: 'POLÍTICA', score: 95,
+                headline: 'Áudio vazado sugere negociação de propina em emenda parlamentar',
+                timeAgo: '10:50',
+                tags: ['Vazamento', 'Congresso'], sources: ['WhatsApp (Viral)', 'Blogs Oposicionistas'],
+                reasons: ['Risco: Viralização extrema sem fonte primária'],
+                summary: 'Um áudio de 2 minutos atribuído ao Deputado Y circula afirmando que a liberação da verba dependia de repasse de 10% para empreiteiras. Nenhum veículo tradicional confirmou a autenticidade.',
+                evidence: null,
+                deltas: [],
+                timeline: [
+                    { time: '10:00', source: 'Telegram', text: 'Áudio surge em canal anônimo.' },
+                    { time: '10:40', source: 'Blog X', text: 'Matéria transcreve o áudio acusando o deputado.' }
+                ]
+            },
+            {
+                id: 'e3', via: 'oceano_azul', status: 'HYDRATING', editoria: 'ECONOMIA', score: 88,
+                headline: 'Aditivo Contratual: Exército prorroga compra de blindados (R$ 1.2 Bilhões)',
+                timeAgo: '11:02',
+                tags: ['Contrato', 'DOU', 'Exclusivo'], sources: ['Diário Oficial da União'],
+                reasons: ['Documento oficial identificado', 'Zero cobertura Tier-1'],
+                summary: 'Extrato de aditivo publicado na Seção 3 do DOU confirma a prorrogação e aumento de valor do contrato de aquisição de viaturas blindadas.',
+                evidence: {
+                    type: 'DOU - Seção 3',
+                    text: 'EXTRATO DE TERMO ADITIVO Nº 4/2026 - UASG 160069. Número do Contrato: 12/2024. Contratante: COMANDO DO EXERCITO. Contratado: 12.345.678/0001-90 INDUSTRIA BÉLICA SA. Objeto: Prorrogação da vigência por 12 meses e acréscimo de R$ 1.200.000.000,00 correspondente a 25% do valor atualizado. Fundamento Legal: Lei 14.133/2021. Data de Assinatura: 22/02/2026.',
+                    highlights: ['R$ 1.200.000.000,00', '12.345.678/0001-90', 'acréscimo']
+                },
+                deltas: [
+                    { field: 'Valor do Contrato', before: 'R$ 4.800.000.000,00', after: 'R$ 6.000.000.000,00' },
+                    { field: 'Vigência', before: 'Dez/2026', after: 'Dez/2027' }
+                ],
+                timeline: [
+                    { time: '11:00', source: 'DOU', text: 'Documento indexado pela Imprensa Nacional.' },
+                    { time: '11:02', source: 'Radar Engine', text: 'Âncoras financeiras extraídas e validadas.' }
+                ]
+            },
+            {
+                id: 'e4', via: 'triagem', status: 'QUARANTINE', editoria: 'CIDADES', score: 35,
+                headline: 'Prefeito de cidade do interior ataca governador em rádio local',
+                timeAgo: '11:15',
+                tags: ['Baixa Relevância', 'Local'], sources: ['Rádio XYZ'],
+                reasons: ['Sem impacto nacional', 'Baixa diversidade de fontes'],
+                summary: 'Durante entrevista matinal, o prefeito da cidade Z fez críticas duras à gestão estadual sobre falta de repasses da saúde.',
+                evidence: null, deltas: [], timeline: []
+            }
+        ];
+
+        // --- 2. ESTADO GLOBAL DA UI ---
+        let state = {
+            activeVia: 'plantao', // plantao, oceano_azul, triagem
+            selectedEventId: 'e1',
+            activeTab: 'resumo',  // resumo, provas, deltas, timeline
+            isCompactMode: false, // <-- Resolve o problema de Alto Volume
+            isFrozen: false
+        };
+
+        // --- 3. LÓGICA DE RENDERIZAÇÃO ---
+        function renderApp() {
+            renderNav();
+            renderFeed();
+            renderDossier();
+            
+            // Lógica do botão Freeze/Anti-Jump
+            const btnFreeze = document.getElementById('btn-freeze');
+            if(state.isFrozen) {
+                btnFreeze.innerHTML = '<i class="fa-solid fa-play"></i>';
+                btnFreeze.classList.add('text-amber-500', 'bg-amber-500/10', 'border-amber-500/50');
+                btnFreeze.classList.remove('text-slate-400');
+                document.getElementById('anti-jump-pill').classList.remove('hidden');
+            } else {
+                btnFreeze.innerHTML = '<i class="fa-solid fa-pause"></i>';
+                btnFreeze.classList.remove('text-amber-500', 'bg-amber-500/10', 'border-amber-500/50');
+                btnFreeze.classList.add('text-slate-400');
+                document.getElementById('anti-jump-pill').classList.add('hidden');
+            }
+
+            // Lógica do botão Density
+            const btnDensity = document.getElementById('btn-density');
+            if(state.isCompactMode) {
+                btnDensity.innerHTML = '<i class="fa-solid fa-table-cells-large"></i>'; // Icon for Cards
+                btnDensity.classList.add('text-brand-400', 'bg-brand-500/10');
+            } else {
+                btnDensity.innerHTML = '<i class="fa-solid fa-list"></i>'; // Icon for List/Compact
+                btnDensity.classList.remove('text-brand-400', 'bg-brand-500/10');
+            }
+        }
+
+        // Navegação Lateral (As Vias do Radar)
+        function renderNav() {
+            const nav = document.getElementById('nav-vias');
+            const vias = [
+                { id: 'plantao', icon: 'fa-bolt', label: 'Plantão (Hard News)', desc: 'Alto volume, confirmações', defEvent: 'e1' },
+                { id: 'oceano_azul', icon: 'fa-anchor', label: 'Oceano Azul', desc: 'Evidências e exclusivas', defEvent: 'e3' },
+                { id: 'triagem', icon: 'fa-filter', label: 'Fila de Triagem', desc: 'Limpeza e quarentena', defEvent: 'e4' }
+            ];
+
+            nav.innerHTML = vias.map(v => {
+                const isActive = state.activeVia === v.id;
+                const baseClasses = "w-full text-left px-3 py-2.5 rounded-md transition-colors flex items-start gap-3 border";
+                const activeClasses = isActive 
+                    ? `bg-dark-800 border-dark-600 shadow-sm` 
+                    : `border-transparent hover:bg-dark-800/50 text-slate-400`;
+                
+                let iconColor = isActive ? (v.id === 'oceano_azul' ? 'text-emerald-500' : 'text-brand-500') : 'text-slate-500';
+
+                return `
+                    <button onclick="changeVia('${v.id}', '${v.defEvent}')" class="${baseClasses} ${activeClasses}">
+                        <div class="mt-0.5 ${iconColor}"><i class="fa-solid ${v.icon}"></i></div>
+                        <div>
+                            <div class="text-[13px] font-bold ${isActive ? 'text-white' : ''}">${v.label}</div>
+                            <div class="text-[10px] text-slate-500 mt-0.5">${v.desc}</div>
+                        </div>
+                    </button>
+                `;
+            }).join('');
+        }
+
+        // O FEED (A Lista de Notícias) - Suporta Alta Densidade
+        function renderFeed() {
+            const container = document.getElementById('feed-container');
+            const events = MOCK_EVENTS.filter(e => e.via === state.activeVia);
+
+            container.innerHTML = events.map(evt => {
+                const isSelected = state.selectedEventId === evt.id;
+                
+                // Semântica Visual de Borda/Fundo baseada no Status (A cor comunica a urgência)
+                let statusClasses = '';
+                if (evt.status === 'UNVERIFIED_VIRAL') {
+                    statusClasses = isSelected ? 'border-red-500/50 bg-red-950/20' : 'border-red-900/30 bg-red-950/10 border-dashed';
+                } else if (evt.status === 'QUARANTINE') {
+                    statusClasses = isSelected ? 'border-dark-600 bg-dark-800' : 'border-transparent border-b-dark-800 opacity-60';
+                } else if (evt.via === 'oceano_azul') {
+                    statusClasses = isSelected ? 'border-emerald-500/40 bg-emerald-950/10' : 'border-transparent border-b-dark-800';
+                } else { // HOT ou HYDRATING no Plantão
+                    statusClasses = isSelected ? 'border-brand-500/40 bg-brand-900/10 shadow-[inset_2px_0_0_#3b82f6]' : 'border-transparent border-b-dark-800';
+                }
+
+                // --- MODO COMPACTO (Alta Densidade) ---
+                if (state.isCompactMode) {
+                    return `
+                        <div onclick="selectEvent('${evt.id}')" class="px-3 py-2 cursor-pointer border hover:bg-dark-800 flex items-center gap-3 ${statusClasses}">
+                            <div class="text-[11px] font-mono text-slate-500 w-10 shrink-0">${evt.timeAgo}</div>
+                            <div class="text-[10px] font-bold uppercase tracking-wider w-16 shrink-0 truncate ${evt.status==='UNVERIFIED_VIRAL' ? 'text-red-400' : 'text-brand-400'}">${evt.editoria}</div>
+                            <div class="flex-1 truncate text-[13px] font-medium ${isSelected ? 'text-white' : 'text-slate-300'}">${evt.headline}</div>
+                            <div class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-dark-800 text-slate-400 shrink-0 w-8 text-center">${evt.score}</div>
+                        </div>
+                    `;
+                }
+
+                // --- MODO CONFORTÁVEL (Com Tags e Fontes) ---
+                return `
+                    <div onclick="selectEvent('${evt.id}')" class="p-3 cursor-pointer border-b hover:bg-dark-800 ${statusClasses}">
+                        <div class="flex justify-between items-start mb-1.5">
+                            <div class="flex items-center gap-2">
+                                <span class="text-[11px] font-mono text-slate-500">${evt.timeAgo}</span>
+                                <span class="text-[10px] font-bold uppercase tracking-wider text-brand-500 bg-brand-950/30 px-1.5 py-0.5 rounded">${evt.editoria}</span>
+                                ${evt.status === 'HYDRATING' ? `<span class="text-[10px] text-amber-500 flex items-center gap-1"><i class="fa-solid fa-circle-notch fa-spin"></i> Baixando PDF...</span>` : ''}
+                            </div>
+                            <div class="text-[11px] font-bold bg-dark-800 border border-dark-700 text-slate-300 px-1.5 py-0.5 rounded" title="Score de Relevância">${evt.score}</div>
+                        </div>
+                        
+                        <h3 class="text-[14px] font-semibold leading-snug mb-2 ${evt.status === 'QUARANTINE' ? 'text-slate-400' : (isSelected ? 'text-white' : 'text-slate-200')}">
+                            ${evt.headline}
+                        </h3>
+                        
+                        ${evt.status === 'UNVERIFIED_VIRAL' ? `
+                            <div class="mb-2 inline-flex items-center gap-1.5 text-[10px] font-bold text-red-400 bg-red-950/40 border border-red-900/50 px-2 py-1 rounded">
+                                <i class="fa-solid fa-triangle-exclamation"></i> ALERTA: Sem Confirmação Oficial
+                            </div>
+                        ` : ''}
+
+                        <div class="flex justify-between items-center mt-2">
+                            <div class="flex gap-1.5 overflow-hidden">
+                                ${evt.tags.map(t => `<span class="text-[10px] bg-dark-800 text-slate-400 px-1.5 py-0.5 rounded truncate max-w-[80px]">${t}</span>`).join('')}
+                            </div>
+                            <div class="text-[11px] text-slate-500 shrink-0 flex items-center gap-1">
+                                <i class="fa-solid fa-newspaper text-[10px]"></i> ${evt.sources[0]} ${evt.sources.length > 1 ? `+${evt.sources.length - 1}` : ''}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // O DOSSIÊ (Painel da Direita - Mesa de Operação)
+        function renderDossier() {
+            const container = document.getElementById('dossie-container');
+            const evt = MOCK_EVENTS.find(e => e.id === state.selectedEventId);
+
+            if (!evt) {
+                container.innerHTML = `<div class="flex-1 flex flex-col items-center justify-center text-slate-600"><i class="fa-solid fa-satellite-dish text-4xl mb-4 opacity-20"></i><p>Selecione um evento no feed</p></div>`;
+                return;
+            }
+
+            // AÇÃO GATING E BOTÕES EDITORIAIS
+            let actionBar = '';
+            if (state.activeVia === 'triagem') {
+                actionBar = `
+                    <button class="flex-1 py-2 bg-dark-800 hover:bg-dark-700 text-slate-300 border border-dark-600 rounded text-[13px] font-semibold flex items-center justify-center gap-2"><i class="fa-solid fa-code-merge"></i> Fazer Merge</button>
+                    <button class="flex-1 py-2 bg-red-950/20 hover:bg-red-900/40 text-red-400 border border-red-900/50 rounded text-[13px] font-semibold flex items-center justify-center gap-2"><i class="fa-solid fa-trash"></i> Descartar</button>
+                    <button class="flex-1 py-2 bg-brand-900/20 hover:bg-brand-800/40 text-brand-400 border border-brand-800/50 rounded text-[13px] font-semibold flex items-center justify-center gap-2"><i class="fa-solid fa-arrow-up"></i> Elevar ao Plantão</button>
+                `;
+            } else {
+                let mainAction = '';
+                if (evt.status === 'HYDRATING') {
+                    // Action Gating: Bloqueia a pauta enquanto baixa a prova
+                    mainAction = `<button disabled class="flex-1 py-2 bg-dark-800 text-slate-500 border border-dark-700 rounded text-[13px] font-bold cursor-not-allowed flex items-center justify-center gap-2"><i class="fa-solid fa-circle-notch fa-spin"></i> Lendo documento oficial...</button>`;
+                } else if (evt.status === 'UNVERIFIED_VIRAL') {
+                    // Tratamento para Boato Viral (Furo sem prova)
+                    mainAction = `<button class="flex-1 py-2 bg-red-600 hover:bg-red-500 text-white rounded text-[13px] font-bold flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(220,38,38,0.2)]"><i class="fa-solid fa-triangle-exclamation"></i> Pautar como Rascunho (NÃO VERIFICADO) <span class="bg-red-800 px-1.5 rounded text-[10px] ml-2 font-mono">P</span></button>`;
+                } else {
+                    // Pautar Padrão / Exclusiva
+                    mainAction = `<button class="flex-1 py-2 bg-brand-600 hover:bg-brand-500 text-white rounded text-[13px] font-bold flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(37,99,235,0.2)]"><i class="fa-solid fa-pen-nib"></i> Criar Pauta no CMS <span class="bg-brand-800 px-1.5 rounded text-[10px] ml-2 font-mono">P</span></button>`;
+                }
+
+                actionBar = `
+                    ${mainAction}
+                    <button class="px-4 py-2 bg-dark-800 hover:bg-dark-700 text-slate-300 border border-dark-600 rounded text-[13px] font-medium flex items-center gap-2" title="Pausar o alerta deste evento">Snooze <span class="font-mono text-[10px] opacity-50">S</span></button>
+                    <button class="px-4 py-2 bg-dark-800 hover:bg-dark-700 text-slate-300 border border-dark-600 rounded text-[13px] font-medium flex items-center gap-2" title="Descartar evento">Ignorar <span class="font-mono text-[10px] opacity-50">I</span></button>
+                `;
+            }
+
+            container.innerHTML = `
+                <!-- Cabeçalho do Dossiê -->
+                <div class="px-6 py-5 border-b border-dark-700 bg-dark-900 shrink-0">
+                    <div class="flex items-center gap-3 mb-3">
+                        <span class="text-[10px] font-bold uppercase tracking-wider ${evt.via === 'oceano_azul' ? 'text-emerald-500 bg-emerald-950/30' : 'text-brand-500 bg-brand-950/30'} px-2 py-0.5 rounded border ${evt.via === 'oceano_azul' ? 'border-emerald-900/50' : 'border-brand-900/50'}">
+                            ${evt.editoria}
+                        </span>
+                        <div class="flex gap-2 text-[11px] text-slate-400 font-mono">
+                            <span>ID: ${evt.id.toUpperCase()}</span>
+                            <span>•</span>
+                            <span>Score: ${evt.score}</span>
+                        </div>
+                    </div>
+                    
+                    <h1 class="text-2xl font-bold text-white leading-tight mb-5">${evt.headline}</h1>
+                    
+                    <div class="flex gap-2 w-full">${actionBar}</div>
+                </div>
+                
+                <!-- Abas da Mesa de Apuração -->
+                <div class="flex border-b border-dark-700 px-6 bg-dark-900 shrink-0" id="tabs-header">
+                    <!-- Preenchido via JS -->
+                </div>
+                
+                <!-- Conteúdo das Abas (Scrollável) -->
+                <div class="flex-1 overflow-y-auto p-6 bg-[#0a0f18]" id="tabs-content">
+                    <!-- Preenchido via JS -->
+                </div>
+            `;
+
+            renderTabs();
+        }
+
+        function renderTabs() {
+            const header = document.getElementById('tabs-header');
+            const content = document.getElementById('tabs-content');
+            const evt = MOCK_EVENTS.find(e => e.id === state.selectedEventId);
+            
+            if(!evt || !header || !content) return;
+
+            const tabs = [
+                { id: 'resumo', label: '1. O Fato' },
+                { id: 'provas', label: '2. Provas (Documentos)' },
+                { id: 'deltas', label: '3. Evolução (Deltas)' },
+                { id: 'timeline', label: '4. Grafo de Publicação' }
+            ];
+
+            // Tabs Header
+            header.innerHTML = tabs.map(t => `
+                <button onclick="changeTab('${t.id}')" class="px-5 py-3 text-[13px] font-semibold border-b-2 transition-colors ${state.activeTab === t.id ? 'border-brand-500 text-brand-400' : 'border-transparent text-slate-500 hover:text-slate-300'}">
+                    ${t.label}
+                </button>
+            `).join('');
+
+            // Tabs Content
+            let html = '';
+            if (state.activeTab === 'resumo') {
+                html = `
+                    <div class="max-w-3xl space-y-6">
+                        <div>
+                            <h3 class="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Por que isto está no Radar?</h3>
+                            <ul class="space-y-1.5">
+                                ${evt.reasons.map(r => `<li class="flex items-start gap-2 text-[14px] text-slate-300"><i class="fa-solid fa-circle-check text-emerald-500 mt-1 text-[10px]"></i> ${r}</li>`).join('')}
+                            </ul>
+                        </div>
+                        
+                        <div class="bg-dark-800/50 border border-dark-700 p-5 rounded-lg">
+                            <h3 class="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Resumo Automático (Clean Text)</h3>
+                            <p class="text-[15px] leading-relaxed text-slate-200">${evt.summary}</p>
+                        </div>
+                        
+                        <div>
+                            <h3 class="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Fontes Primárias Envolvidas</h3>
+                            <div class="flex flex-wrap gap-2">
+                                ${evt.sources.map(s => `
+                                    <a href="#" class="px-3 py-1.5 bg-dark-800 border border-dark-600 rounded text-[13px] text-brand-400 hover:text-brand-300 hover:border-brand-500 transition-colors flex items-center gap-2">
+                                        <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i> ${s}
+                                    </a>
+                                `).join('')}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            } else if (state.activeTab === 'provas') {
+                if (evt.evidence) {
+                    // Evidence Highlighter: O Pulo do Gato para mineração de dados
+                    let highlightedText = evt.evidence.text;
+                    evt.evidence.highlights.forEach(h => {
+                        const regex = new RegExp(`(${h})`, 'g');
+                        // Marca-texto realista
+                        highlightedText = highlightedText.replace(regex, `<mark class="bg-amber-400/30 text-amber-200 px-1 rounded font-semibold border-b border-amber-500/50">$1</mark>`);
+                    });
+
+                    html = `
+                        <div class="max-w-3xl">
+                            <div class="flex items-center justify-between mb-3">
+                                <span class="text-xs font-bold text-slate-500 uppercase tracking-widest">Extrato de Documento Oficial</span>
+                                <span class="text-[11px] font-mono text-slate-400 bg-dark-800 px-2 py-1 rounded">Origem: ${evt.evidence.type}</span>
+                            </div>
+                            
+                            <!-- Visão de "Papel Timbrado/Terminal" -->
+                            <div class="bg-[#1e1e1e] border border-dark-600 p-6 rounded-lg text-slate-300 leading-loose text-[14px] font-mono shadow-inner">
+                                ${highlightedText}
+                            </div>
+                            
+                            <div class="mt-4 flex gap-3">
+                                <button class="text-[13px] text-white bg-dark-800 hover:bg-dark-700 border border-dark-600 px-4 py-2 rounded font-medium flex items-center gap-2"><i class="fa-regular fa-file-pdf text-red-400"></i> Descarregar PDF Original</button>
+                                <button class="text-[13px] text-white bg-dark-800 hover:bg-dark-700 border border-dark-600 px-4 py-2 rounded font-medium flex items-center gap-2"><i class="fa-regular fa-copy"></i> Copiar Fragmento</button>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    html = `
+                        <div class="max-w-3xl flex flex-col items-center justify-center py-20 text-slate-500 border border-dashed border-dark-700 rounded-lg">
+                            <i class="fa-solid fa-magnifying-glass-arrow-right text-3xl mb-4 opacity-30"></i>
+                            <p class="text-[14px]">Nenhum documento determinístico (CNPJ/Valor/PDF) ancorado a este fato.</p>
+                            ${evt.status === 'HYDRATING' ? '<p class="text-brand-500 text-xs mt-2 font-mono flex items-center gap-2"><i class="fa-solid fa-circle-notch fa-spin"></i> Robô a ler diários oficiais...</p>' : ''}
+                        </div>
+                    `;
+                }
+            } else if (state.activeTab === 'deltas') {
+                if (evt.deltas && evt.deltas.length > 0) {
+                    html = `
+                        <div class="max-w-3xl">
+                            <div class="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">Auditoria de Alterações (Value Deltas)</div>
+                            <div class="border border-dark-700 rounded-lg overflow-hidden bg-dark-800">
+                                <table class="w-full text-left">
+                                    <thead>
+                                        <tr class="bg-dark-900 border-b border-dark-700 text-slate-400 text-[11px] uppercase">
+                                            <th class="p-3 font-medium w-1/3">O que evoluiu</th>
+                                            <th class="p-3 font-medium w-1/3">Antes (Histórico)</th>
+                                            <th class="p-3 font-medium w-1/3 text-emerald-500">Novo Fato</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="text-[13px] divide-y divide-dark-700">
+                                        ${evt.deltas.map(d => `
+                                            <tr class="hover:bg-dark-700/50">
+                                                <td class="p-3 text-slate-300 font-medium">${d.field}</td>
+                                                <td class="p-3 text-slate-500 line-through">${d.before}</td>
+                                                <td class="p-3 text-emerald-400 font-bold bg-emerald-950/10"><i class="fa-solid fa-plus text-[10px] mr-1"></i> ${d.after}</td>
+                                            </tr>
+                                        `).join('')}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    html = `<p class="text-slate-500 text-[14px]">Nenhuma alteração de valor, data ou entidade detetada entre as versões deste facto.</p>`;
+                }
+            } else if (state.activeTab === 'timeline') {
+                html = `
+                    <div class="max-w-2xl">
+                        <div class="text-xs font-bold text-slate-500 uppercase tracking-widest mb-5">Como o facto se propagou</div>
+                        <div class="relative border-l-2 border-dark-700 ml-3 pl-6 space-y-6">
+                            ${evt.timeline.map((item, idx) => `
+                                <div class="relative">
+                                    <div class="absolute -left-[29px] top-1 w-2.5 h-2.5 bg-dark-500 rounded-full border-2 border-dark-900 ring-2 ring-dark-700"></div>
+                                    <div class="flex items-center gap-3 mb-1">
+                                        <span class="text-[11px] font-mono text-slate-400">${item.time}</span>
+                                        <span class="text-[11px] font-bold uppercase text-brand-500 bg-brand-950/30 px-2 py-0.5 rounded">${item.source}</span>
+                                    </div>
+                                    <p class="text-[14px] text-slate-300 leading-relaxed">${item.text}</p>
+                                </div>
+                            `).join('')}
+                            <div class="relative pt-2">
+                                <div class="absolute -left-[32px] top-4 w-4 h-4 bg-brand-500/20 rounded-full animate-ping"></div>
+                                <div class="absolute -left-[29px] top-4.5 w-2.5 h-2.5 bg-brand-500 rounded-full ring-2 ring-dark-900"></div>
+                                <p class="text-[12px] font-bold text-brand-400">Agora (Visível no Radar)</p>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+            content.innerHTML = html;
+        }
+
+        // Interações
+        function changeVia(via, defaultEventId) {
+            state.activeVia = via;
+            state.selectedEventId = defaultEventId;
+            state.activeTab = 'resumo';
+            renderApp();
+        }
+
+        function selectEvent(id) {
+            state.selectedEventId = id;
+            renderApp();
+        }
+
+        function changeTab(tab) {
+            state.activeTab = tab;
+            renderTabs();
+        }
+
+        // Event Listeners (Comportamento de Teclado Profissional)
+        document.getElementById('btn-density').addEventListener('click', () => {
+            state.isCompactMode = !state.isCompactMode;
+            renderApp();
+        });
+
+        document.getElementById('btn-freeze').addEventListener('click', () => {
+            state.isFrozen = !state.isFrozen;
+            renderApp();
+        });
+
+        document.addEventListener('keydown', (e) => {
+            // Tecla P - Pautar (simula ação)
+            if (e.key === 'p' || e.key === 'P') {
+                if(e.target.tagName !== 'INPUT') alert('Atalho: Draft criado no CMS!');
+            }
+            // Espaço - Toggle Freeze
+            if (e.code === 'Space' && e.target.tagName !== 'INPUT') {
+                e.preventDefault();
+                state.isFrozen = !state.isFrozen;
+                renderApp();
+            }
+        });
+
+        // Inicializar
+        renderApp();
+    </script>
+</body>
+</html>
