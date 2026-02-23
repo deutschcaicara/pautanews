@@ -13,6 +13,7 @@ dependencies = [
     # ── Database ──
     "sqlalchemy[asyncio]>=2.0.36",
     "asyncpg>=0.30.0",
+    "psycopg[binary]>=3.2.0",
     "psycopg2-binary>=2.9.10",
     "alembic>=1.14.0",
     "greenlet>=3.1.0",
@@ -30,10 +31,17 @@ dependencies = [
     "pytesseract>=0.3.13",
     # ── Observability ──
     "prometheus-client>=0.21.0",
+    "opentelemetry-api>=1.29.0",
+    "opentelemetry-sdk>=1.29.0",
+    "opentelemetry-instrumentation-fastapi>=0.50b0",
+    "opentelemetry-instrumentation-httpx>=0.50b0",
+    "opentelemetry-instrumentation-celery>=0.50b0",
     "python-json-logger>=3.2.0",
     # ── Utils ──
     "python-dotenv>=1.0.0",
     "redis>=5.2.0",
+    # ── Tests ──
+    "pytest>=8.3.0",
 ]
 
 [build-system]

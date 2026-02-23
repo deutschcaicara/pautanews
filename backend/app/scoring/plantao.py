@@ -13,6 +13,8 @@ REASONS = {
     "PLANTAO_VELOCITY_SPIKE": "Velocity spike detected",
     "PLANTAO_TIER_WEIGHT": "High-tier source weight",
     "PLANTAO_DIVERSITY": "Multiple independent sources",
+    "PLANTAO_IMPACT_HEURISTIC": "Weak impact heuristic signal",
+    "PLANTAO_TRUST_PENALTY": "Trust penalty applied",
     "PLANTAO_DECAY": "Exponential decay applied",
 }
 
@@ -21,6 +23,8 @@ def calculate_plantao_score(
     velocity: float,
     source_count: int,
     first_seen_at: datetime,
+    impact_signal: float = 0.0,
+    trust_penalty: float = 0.0,
     base_weight: float = 10.0
 ) -> Dict[str, Any]:
     """Calculate SCORE_PLANTAO with exponential decay."""
@@ -33,7 +37,10 @@ def calculate_plantao_score(
     # 3. Diversity (sqrt scaling)
     diversity_boost = math.sqrt(source_count) * 3.0
     
-    raw_score = base_weight + tier_weight + velocity_boost + diversity_boost
+    impact_boost = max(0.0, min(10.0, float(impact_signal))) * 0.8
+
+    raw_score = base_weight + tier_weight + velocity_boost + diversity_boost + impact_boost
+    raw_score -= max(0.0, min(20.0, float(trust_penalty)))
     
     # 4. Decay (Blueprint §12.1)
     # Decay half-life: 2 hours
@@ -46,6 +53,8 @@ def calculate_plantao_score(
     if velocity > 5: reasons.append("PLANTAO_VELOCITY_SPIKE")
     if tier == 1: reasons.append("PLANTAO_TIER_WEIGHT")
     if source_count > 2: reasons.append("PLANTAO_DIVERSITY")
+    if impact_boost > 0.5: reasons.append("PLANTAO_IMPACT_HEURISTIC")
+    if trust_penalty > 0.0: reasons.append("PLANTAO_TRUST_PENALTY")
     if decay_factor < 0.8: reasons.append("PLANTAO_DECAY")
     
     return {

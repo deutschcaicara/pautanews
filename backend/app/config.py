@@ -23,6 +23,10 @@ class Settings(BaseSettings):
 
     # ── RabbitMQ / Celery ──
     CELERY_BROKER_URL: str = "amqp://radar:radar_secret@rabbitmq:5672//"
+    RABBITMQ_MANAGEMENT_URL: str | None = None
+    RABBITMQ_MANAGEMENT_USER: str | None = None
+    RABBITMQ_MANAGEMENT_PASSWORD: str | None = None
+    RABBITMQ_MANAGEMENT_TIMEOUT_S: float = 2.0
 
     # ── Redis ──
     REDIS_URL: str = "redis://redis:6379/0"
@@ -36,12 +40,18 @@ class Settings(BaseSettings):
     SLO_FAST_PATH_S: int = 60
     SLO_RENDER_PATH_S: int = 120
     SLO_DEEP_PATH_S: int = 300
+    HYDRATION_TIMEOUT_FAST_S: int = 15
+    HYDRATION_TIMEOUT_RENDER_S: int = 45
 
     # ── QUARANTINE TTL (seconds) ──
     QUARANTINE_TTL_S: int = 900  # 15 min
 
     # ── Alert cooldown (seconds) ──
     ALERT_COOLDOWN_S: int = 300
+
+    # ── LLM / NLP ──
+    GEMINI_API_KEY: str | None = None
+    LLM_MODEL: str = "gemini-1.5-flash"
 
 
 settings = Settings()

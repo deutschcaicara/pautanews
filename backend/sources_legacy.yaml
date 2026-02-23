@@ -1,0 +1,765 @@
+sources:
+- name: Planalto - Noticias
+  type: rss
+  url: https://www.gov.br/planalto/pt-br/acompanhe-o-planalto/noticias/RSS
+  editoria: politica
+  priority: S0
+- name: Planalto - Agenda
+  type: watch
+  url: https://www.gov.br/planalto/pt-br/acompanhe-o-planalto/agenda-do-presidente-da-republica
+  editoria: politica
+  priority: S0
+- name: Senado - RSS Noticias
+  type: rss
+  url: https://www12.senado.leg.br/noticias/rss
+  editoria: politica
+  priority: S0
+- name: Senado - Noticias
+  type: watch
+  url: https://www12.senado.leg.br/noticias
+  editoria: politica
+  priority: S1
+- name: Camara - Noticias
+  type: watch
+  url: https://www.camara.leg.br/noticias/
+  editoria: politica
+  priority: S0
+- name: Camara - Agenda
+  type: watch
+  url: https://www.camara.leg.br/agenda
+  editoria: politica
+  priority: S1
+- name: Agencia Brasil - Politica (RSS)
+  type: rss
+  url: https://agenciabrasil.ebc.com.br/rss/politica/feed.xml
+  editoria: politica
+  priority: S1
+- name: PT - Noticias
+  type: watch
+  url: https://pt.org.br/noticias/
+  editoria: politica
+  priority: S2
+- name: NOVO - Noticias
+  type: watch
+  url: https://novo.org.br/noticias/
+  editoria: politica
+  priority: S2
+- name: MDB - Noticias
+  type: watch
+  url: https://mdb.org.br/noticias/
+  editoria: politica
+  priority: S2
+- name: PSDB - Noticias
+  type: watch
+  url: https://www.psdb.org.br/noticias/
+  editoria: politica
+  priority: S2
+- name: PSOL - Noticias
+  type: watch
+  url: https://psol50.org.br/noticias/
+  editoria: politica
+  priority: S2
+- name: Uniao Brasil - Noticias
+  type: watch
+  url: https://uniaobrasil.org.br/noticias/
+  editoria: politica
+  priority: S2
+- name: Podemos - Noticias
+  type: watch
+  url: https://www.podemos.org.br/noticias/
+  editoria: politica
+  priority: S2
+- name: PSD - Noticias
+  type: watch
+  url: https://psd.org.br/noticias/
+  editoria: politica
+  priority: S2
+- name: STF - Noticias
+  type: watch
+  url: https://noticias.stf.jus.br/
+  editoria: justica
+  priority: S0
+- name: STF - Pautas
+  type: watch
+  url: https://noticias.stf.jus.br/?s=pauta
+  editoria: justica
+  priority: S0
+- name: STJ - Noticias
+  type: watch
+  url: https://www.stj.jus.br/sites/portalp/Inicio
+  editoria: justica
+  priority: S0
+- name: TSE - Noticias
+  type: watch
+  url: https://www.tse.jus.br/comunicacao/noticias
+  editoria: justica
+  priority: S0
+- name: CNJ - Noticias
+  type: watch
+  url: https://www.cnj.jus.br/noticias/
+  editoria: justica
+  priority: S1
+- name: MPF - Noticias
+  type: watch
+  url: https://www.mpf.mp.br/comunicacao/noticias
+  editoria: justica
+  priority: S0
+- name: PGR - Noticias
+  type: watch
+  url: https://www.mpf.mp.br/o-mpf/unidades/procuradoria-geral-da-republica-pgr/noticias
+  editoria: justica
+  priority: S0
+- name: AGU - Noticias
+  type: watch
+  url: https://www.gov.br/agu/pt-br/comunicacao/noticias
+  editoria: justica
+  priority: S1
+- name: DPU - Noticias
+  type: watch
+  url: https://www.dpu.def.br/noticias-institucional
+  editoria: justica
+  priority: S1
+- name: CJF - Noticias
+  type: watch
+  url: https://www.cjf.jus.br/cjf/noticias
+  editoria: justica
+  priority: S1
+- name: STM - Noticias
+  type: watch
+  url: https://www.stm.jus.br/informacao/agencia-de-noticias
+  editoria: justica
+  priority: S1
+- name: TRF1 - Noticias
+  type: watch
+  url: https://www.trf6.jus.br/noticias/
+  editoria: justica
+  priority: S2
+- name: TRF3 - Noticias
+  type: watch
+  url: https://portal.trf6.jus.br/noticias/
+  editoria: justica
+  priority: S2
+- name: TRF4 - Noticias
+  type: watch
+  url: https://www.trf4.jus.br/trf4/controlador.php?acao=noticia_home
+  editoria: justica
+  priority: S2
+- name: TRF5 - Noticias
+  type: watch
+  url: https://www.trf5.jus.br/index.php/noticias
+  editoria: justica
+  priority: S2
+- name: Bacen - Noticias
+  type: watch
+  url: https://www.bcb.gov.br/detalhenoticia
+  editoria: economia
+  priority: S0
+- name: Bacen - Comunicados
+  type: watch
+  url: https://www.bcb.gov.br/publicacoes/comunicados
+  editoria: economia
+  priority: S0
+- name: Bacen - Copom
+  type: watch
+  url: https://www.bcb.gov.br/controleinflacao/copom
+  editoria: economia
+  priority: S0
+- name: CVM - Noticias
+  type: rss
+  url: https://www.gov.br/cvm/pt-br/assuntos/noticias/RSS
+  editoria: economia
+  priority: S0
+- name: CADE - Noticias
+  type: watch
+  url: https://www.gov.br/cade/pt-br/assuntos/noticias
+  editoria: economia
+  priority: S0
+- name: TCU - Noticias
+  type: watch
+  url: https://portal.tcu.gov.br/imprensa/noticias/
+  editoria: economia
+  priority: S0
+- name: CGU - Noticias
+  type: watch
+  url: https://www.gov.br/cgu/pt-br/assuntos/noticias
+  editoria: economia
+  priority: S0
+- name: Ministerio da Fazenda - Noticias
+  type: watch
+  url: https://www.gov.br/fazenda/pt-br/assuntos/noticias
+  editoria: economia
+  priority: S1
+- name: Receita Federal - Noticias
+  type: rss
+  url: https://www.gov.br/receitafederal/pt-br/assuntos/noticias/RSS
+  editoria: economia
+  priority: S1
+- name: Tesouro Nacional - Noticias
+  type: watch
+  url: https://www.gov.br/tesouronacional/pt-br/noticias
+  editoria: economia
+  priority: S1
+- name: Planejamento - Noticias
+  type: watch
+  url: https://www.gov.br/planejamento/pt-br/assuntos/noticias
+  editoria: economia
+  priority: S1
+- name: BNDES - Noticias
+  type: watch
+  url: https://www.bndes.gov.br/wps/portal/site/home/imprensa/noticias
+  editoria: economia
+  priority: S1
+- name: B3 - Noticias
+  type: watch
+  url: https://www.b3.com.br/pt_br/noticias/
+  editoria: economia
+  priority: S2
+- name: Febraban - Noticias
+  type: watch
+  url: https://portal.febraban.org.br/noticias
+  editoria: economia
+  priority: S2
+- name: Agencia Brasil - Economia (RSS)
+  type: rss
+  url: https://agenciabrasil.ebc.com.br/rss/economia/feed.xml
+  editoria: economia
+  priority: S1
+- name: Ministerio da Saude - Noticias
+  type: rss
+  url: https://www.gov.br/saude/pt-br/assuntos/noticias/RSS
+  editoria: saude
+  priority: S0
+- name: Anvisa - Noticias
+  type: watch
+  url: https://www.gov.br/anvisa/pt-br/assuntos/noticias-anvisa
+  editoria: saude
+  priority: S0
+- name: ANS - Noticias
+  type: rss
+  url: https://www.gov.br/ans/pt-br/assuntos/noticias/RSS
+  editoria: saude
+  priority: S1
+- name: Fiocruz - RSS
+  type: rss
+  url: https://fiocruz.br/rss.xml
+  editoria: saude
+  priority: S1
+- name: Fiocruz - Noticias
+  type: watch
+  url: https://portal.fiocruz.br/noticias
+  editoria: saude
+  priority: S1
+- name: Butantan - Noticias
+  type: watch
+  url: https://www.gov.br/funasa/pt-br/assuntos/noticias
+  editoria: saude
+  priority: S1
+- name: OMS Brasil - Country
+  type: watch
+  url: https://www.who.int/countries/bra/
+  editoria: saude
+  priority: S1
+- name: Conass - Noticias
+  type: watch
+  url: https://www.conass.org.br/category/noticias/
+  editoria: saude
+  priority: S2
+- name: Conasems - Noticias
+  type: watch
+  url: https://www.conasems.org.br/category/noticias/
+  editoria: saude
+  priority: S2
+- name: Ans - Agenda Regulatoria
+  type: watch
+  url: https://www.gov.br/ans/pt-br/acesso-a-informacao/participacao-da-sociedade/agenda-regulatoria
+  editoria: saude
+  priority: S2
+- name: INCQS - Noticias
+  type: watch
+  url: https://www.incqs.fiocruz.br/index.php?option=com_content&view=category&id=72
+  editoria: saude
+  priority: S2
+- name: Funasa - Noticias
+  type: watch
+  url: https://www.gov.br/funasa/pt-br/assuntos/noticias
+  editoria: saude
+  priority: S2
+- name: Saude - Vigilancia
+  type: rss
+  url: https://www.gov.br/saude/pt-br/composicao/svsa/RSS
+  editoria: saude
+  priority: S2
+- name: Agencia Brasil - Saude (RSS)
+  type: rss
+  url: https://agenciabrasil.ebc.com.br/rss/saude/feed.xml
+  editoria: saude
+  priority: S1
+- name: Inca - Noticias
+  type: watch
+  url: https://www.gov.br/inca/pt-br/assuntos/noticias
+  editoria: saude
+  priority: S2
+- name: Policia Federal - Noticias
+  type: watch
+  url: https://www.gov.br/pf/pt-br/assuntos/noticias
+  editoria: seguranca
+  priority: S0
+- name: PRF - Noticias
+  type: watch
+  url: https://www.gov.br/prf/pt-br/noticias
+  editoria: seguranca
+  priority: S1
+- name: MJSP - Noticias
+  type: watch
+  url: https://www.gov.br/mj/pt-br/assuntos/noticias
+  editoria: seguranca
+  priority: S1
+- name: Defesa Civil Nacional
+  type: rss
+  url: https://www.gov.br/mdr/pt-br/assuntos/protecao-e-defesa-civil/RSS
+  editoria: seguranca
+  priority: S1
+- name: ABIN - Noticias
+  type: watch
+  url: https://www.gov.br/abin/pt-br/centrais-de-conteudo/noticias
+  editoria: seguranca
+  priority: S1
+- name: Defesa - Noticias
+  type: watch
+  url: https://www.gov.br/defesa/pt-br/centrais-de-conteudo/noticias
+  editoria: seguranca
+  priority: S1
+- name: Senasp - Noticias
+  type: watch
+  url: https://www.gov.br/senasp/pt-br/assuntos/noticias
+  editoria: seguranca
+  priority: S1
+- name: Senad - Noticias
+  type: watch
+  url: https://www.gov.br/senad/pt-br/assuntos/noticias
+  editoria: seguranca
+  priority: S1
+- name: Forca Nacional
+  type: watch
+  url: https://www.gov.br/mj/pt-br/assuntos/sua-seguranca/seguranca-publica/forca-nacional
+  editoria: seguranca
+  priority: S2
+- name: CNMP - Noticias
+  type: watch
+  url: https://www.cnmp.mp.br/portal/todas-as-noticias
+  editoria: seguranca
+  priority: S2
+- name: Conselho Nacional de Seguranca Publica
+  type: watch
+  url: https://www.gov.br/mj/pt-br/assuntos/sua-seguranca/seguranca-publica
+  editoria: seguranca
+  priority: S2
+- name: Depen - Noticias
+  type: watch
+  url: https://www.gov.br/senappen/pt-br/assuntos/noticias
+  editoria: seguranca
+  priority: S2
+- name: Secretaria Nacional de Politicas Penais
+  type: watch
+  url: https://www.gov.br/senappen/pt-br
+  editoria: seguranca
+  priority: S2
+- name: Anatel - Alertas
+  type: watch
+  url: https://www.gov.br/anatel/pt-br/assuntos/noticias
+  editoria: seguranca
+  priority: S2
+- name: Agencia Brasil - Justica (RSS)
+  type: rss
+  url: https://agenciabrasil.ebc.com.br/rss/justica/feed.xml
+  editoria: seguranca
+  priority: S1
+- name: MMA - Noticias
+  type: watch
+  url: https://www.gov.br/mma/pt-br/assuntos/noticias
+  editoria: meio_ambiente
+  priority: S1
+- name: Ibama - Noticias
+  type: rss
+  url: https://www.gov.br/ibama/pt-br/assuntos/noticias/RSS
+  editoria: meio_ambiente
+  priority: S1
+- name: ICMBio - Noticias
+  type: watch
+  url: https://www.gov.br/icmbio/pt-br/assuntos/noticias
+  editoria: meio_ambiente
+  priority: S1
+- name: INPE - Noticias
+  type: rss
+  url: https://www.gov.br/inpe/pt-br/assuntos/ultimas-noticias/RSS
+  editoria: meio_ambiente
+  priority: S1
+- name: INPE - Queimadas
+  type: watch
+  url: https://terrabrasilis.dpi.inpe.br/queimadas/portal/
+  editoria: meio_ambiente
+  priority: S0
+- name: Cemaden - Noticias
+  type: watch
+  url: https://www.gov.br/cemaden/pt-br
+  editoria: meio_ambiente
+  priority: S1
+- name: ANA - Noticias
+  type: watch
+  url: https://www.gov.br/ana/pt-br/assuntos/noticias-e-eventos/noticias
+  editoria: meio_ambiente
+  priority: S1
+- name: Servico Florestal Brasileiro
+  type: watch
+  url: https://www.gov.br/florestal/pt-br/assuntos/noticias
+  editoria: meio_ambiente
+  priority: S2
+- name: MapBiomas - Destaques
+  type: watch
+  url: https://mapbiomas.org/destaques
+  editoria: meio_ambiente
+  priority: S2
+- name: Observatorio do Clima - Noticias
+  type: watch
+  url: https://www.oc.eco.br/
+  editoria: meio_ambiente
+  priority: S2
+- name: WWF Brasil - Noticias
+  type: watch
+  url: https://www.wwf.org.br/?uNewsID=
+  editoria: meio_ambiente
+  priority: S2
+- name: Greenpeace Brasil - Noticias
+  type: watch
+  url: https://www.greenpeace.org/brasil/blog/
+  editoria: meio_ambiente
+  priority: S2
+- name: MMA - Participacao Social
+  type: watch
+  url: https://www.gov.br/mma/pt-br/acesso-a-informacao/participacao-social
+  editoria: meio_ambiente
+  priority: S2
+- name: Agencia Brasil - Meio Ambiente (RSS)
+  type: rss
+  url: https://agenciabrasil.ebc.com.br/rss/meio-ambiente/feed.xml
+  editoria: meio_ambiente
+  priority: S1
+- name: Funai - Noticias
+  type: watch
+  url: https://www.gov.br/funai/pt-br/assuntos/noticias
+  editoria: meio_ambiente
+  priority: S2
+- name: MCTI - Noticias
+  type: watch
+  url: https://www.gov.br/mcti/pt-br/acompanhe-o-mcti/noticias
+  editoria: ciencia
+  priority: S1
+- name: CNPq - Noticias
+  type: watch
+  url: https://www.gov.br/cnpq/pt-br/assuntos/noticias
+  editoria: ciencia
+  priority: S1
+- name: CAPES - Noticias
+  type: rss
+  url: https://www.gov.br/capes/pt-br/assuntos/noticias/RSS
+  editoria: ciencia
+  priority: S1
+- name: INEP - Noticias
+  type: watch
+  url: https://www.gov.br/inep/pt-br/centrais-de-conteudo/noticias
+  editoria: ciencia
+  priority: S1
+- name: IBGE - Noticias
+  type: watch
+  url: https://agenciadenoticias.ibge.gov.br/
+  editoria: ciencia
+  priority: S0
+- name: INMETRO - Noticias
+  type: watch
+  url: https://www.gov.br/inmetro/pt-br/centrais-de-conteudo/noticias
+  editoria: ciencia
+  priority: S1
+- name: EMBRAPA - Noticias
+  type: watch
+  url: https://www.embrapa.br/busca-de-noticias
+  editoria: ciencia
+  priority: S1
+- name: FINEP - Noticias
+  type: watch
+  url: https://www.finep.gov.br/noticias/todas-noticias
+  editoria: ciencia
+  priority: S2
+- name: RNP - Noticias
+  type: watch
+  url: https://www.rnp.br/noticias
+  editoria: ciencia
+  priority: S2
+- name: LNCC - Noticias
+  type: watch
+  url: https://www.gov.br/lncc/pt-br/assuntos/noticias
+  editoria: ciencia
+  priority: S2
+- name: INPE - Centro de Previsao
+  type: watch
+  url: https://www.cptec.inpe.br/
+  editoria: ciencia
+  priority: S1
+- name: FIOCRUZ - Pesquisa
+  type: watch
+  url: https://portal.fiocruz.br/pesquisa-e-inovacao
+  editoria: ciencia
+  priority: S2
+- name: Agencia Brasil - Geral (RSS)
+  type: rss
+  url: https://agenciabrasil.ebc.com.br/rss/geral/feed.xml
+  editoria: ciencia
+  priority: S2
+- name: Agencia Brasil - Educacao (RSS)
+  type: rss
+  url: https://agenciabrasil.ebc.com.br/rss/educacao/feed.xml
+  editoria: ciencia
+  priority: S2
+- name: Agencia Brasil - Cultura (RSS)
+  type: rss
+  url: https://agenciabrasil.ebc.com.br/rss/cultura/feed.xml
+  editoria: ciencia
+  priority: S2
+- name: Itamaraty - Noticias
+  type: watch
+  url: https://www.gov.br/mre/pt-br/canais_atendimento/imprensa/notas-a-imprensa
+  editoria: internacional
+  priority: S1
+- name: ONU News - Brasil
+  type: watch
+  url: https://news.un.org/pt/tags/brasil
+  editoria: internacional
+  priority: S1
+- name: OPAS Brasil - Institucional
+  type: watch
+  url: https://www.paho.org/pt/brasil
+  editoria: internacional
+  priority: S1
+- name: OEA - Press
+  type: watch
+  url: https://www.gov.br/abc/pt-br/assuntos/noticias
+  editoria: internacional
+  priority: S2
+- name: Mercosul - Noticias
+  type: watch
+  url: https://www.mercosur.int/
+  editoria: internacional
+  priority: S2
+- name: ABC - Cooperacao Internacional
+  type: watch
+  url: https://www.gov.br/abc/pt-br/assuntos/noticias
+  editoria: internacional
+  priority: S1
+- name: Banco Mundial Brasil
+  type: watch
+  url: https://www.worldbank.org/pt/country/brazil
+  editoria: internacional
+  priority: S2
+- name: FMI - Brasil
+  type: watch
+  url: https://www.gov.br/mdic/pt-br/assuntos/noticias
+  editoria: internacional
+  priority: S2
+- name: CEPAL Brasil
+  type: watch
+  url: https://www.cepal.org/pt-br/noticias
+  editoria: internacional
+  priority: S2
+- name: MDIC - Noticias
+  type: watch
+  url: https://www.gov.br/mdic/pt-br/assuntos/noticias
+  editoria: internacional
+  priority: S2
+- name: Planalto - Noticias Internacionais
+  type: watch
+  url: https://www.gov.br/planalto/pt-br/acompanhe-o-planalto/noticias
+  editoria: internacional
+  priority: S2
+- name: Agencia Brasil - Internacional (RSS)
+  type: rss
+  url: https://agenciabrasil.ebc.com.br/rss/internacional/feed.xml
+  editoria: internacional
+  priority: S1
+- name: Agencia Brasil - Direitos Humanos (RSS)
+  type: rss
+  url: https://agenciabrasil.ebc.com.br/rss/direitos-humanos/feed.xml
+  editoria: internacional
+  priority: S2
+- name: MRE - Comunicados
+  type: watch
+  url: https://www.gov.br/mre/pt-br/canais_atendimento/imprensa/notas-a-imprensa
+  editoria: internacional
+  priority: S1
+- name: UNESCO Brasil - Noticias
+  type: watch
+  url: https://www.unesco.org/pt/fieldoffice/brasilia
+  editoria: internacional
+  priority: S2
+# Boost hardnews BR/LatAm via RSS direto (sem agregador)
+- name: Agencia Brasil - Ultimas (RSS)
+  type: rss
+  url: https://agenciabrasil.ebc.com.br/rss/ultimasnoticias/feed.xml
+  editoria: politica
+  priority: S1
+# Google News RSS (uso operacional interno para cruzamento de sinal).
+- name: Google Noticias - Politica BR (RSS)
+  type: rss
+  url: "https://news.google.com/rss/search?q=(politica+OR+congresso+OR+planalto+OR+stf)+when:2h&hl=pt-BR&gl=BR&ceid=BR:pt-419"
+  editoria: politica
+  priority: S2
+  source_class: competitor
+  source_group: google_news
+- name: Google Noticias - Economia BR (RSS)
+  type: rss
+  url: "https://news.google.com/rss/search?q=(economia+OR+selic+OR+fiscal+OR+inflacao)+when:2h&hl=pt-BR&gl=BR&ceid=BR:pt-419"
+  editoria: economia
+  priority: S2
+  source_class: competitor
+  source_group: google_news
+- name: Google Noticias - Justica BR (RSS)
+  type: rss
+  url: "https://news.google.com/rss/search?q=(stf+OR+stj+OR+tse+OR+ministerio+publico)+when:2h&hl=pt-BR&gl=BR&ceid=BR:pt-419"
+  editoria: justica
+  priority: S2
+  source_class: competitor
+  source_group: google_news
+- name: Google Noticias - Seguranca BR (RSS)
+  type: rss
+  url: "https://news.google.com/rss/search?q=(policia+OR+operacao+OR+crime+OR+violencia)+when:2h&hl=pt-BR&gl=BR&ceid=BR:pt-419"
+  editoria: seguranca
+  priority: S2
+  source_class: competitor
+  source_group: google_news
+- name: Google Noticias - Saude BR (RSS)
+  type: rss
+  url: "https://news.google.com/rss/search?q=(saude+OR+sus+OR+anvisa+OR+epidemia)+when:2h&hl=pt-BR&gl=BR&ceid=BR:pt-419"
+  editoria: saude
+  priority: S2
+  source_class: competitor
+  source_group: google_news
+- name: Google Noticias - Internacional BR (RSS)
+  type: rss
+  url: "https://news.google.com/rss/search?q=(itamaraty+OR+onu+OR+mercosul+OR+g20)+when:2h&hl=pt-BR&gl=BR&ceid=BR:pt-419"
+  editoria: internacional
+  priority: S2
+  source_class: competitor
+  source_group: google_news
+- name: G1 - Politica (RSS)
+  type: rss
+  url: https://g1.globo.com/rss/g1/politica/
+  editoria: politica
+  priority: S1
+- name: Folha - Poder (RSS)
+  type: rss
+  url: https://feeds.folha.uol.com.br/poder/rss091.xml
+  editoria: politica
+  priority: S1
+- name: Poder360 - Feed
+  type: rss
+  url: https://www.poder360.com.br/feed/
+  editoria: politica
+  priority: S1
+- name: CartaCapital - Feed
+  type: rss
+  url: https://www.cartacapital.com.br/feed/
+  editoria: politica
+  priority: S2
+- name: Revista Forum - RSS
+  type: rss
+  url: https://revistaforum.com.br/rss
+  editoria: politica
+  priority: S2
+- name: Brasil de Fato - Feed
+  type: rss
+  url: https://www.brasildefato.com.br/feed
+  editoria: politica
+  priority: S2
+- name: TVT News - Feed
+  type: rss
+  url: https://tvtnews.com.br/feed/
+  editoria: politica
+  priority: S2
+- name: DCM - Feed
+  type: rss
+  url: https://www.diariodocentrodomundo.com.br/feed/
+  editoria: politica
+  priority: S2
+- name: JOTA - Feed
+  type: rss
+  url: https://www.jota.info/feed
+  editoria: justica
+  priority: S1
+- name: ConJur - Feed
+  type: rss
+  url: https://www.conjur.com.br/feed/
+  editoria: justica
+  priority: S1
+- name: G1 - Economia (RSS)
+  type: rss
+  url: https://g1.globo.com/rss/g1/economia/
+  editoria: economia
+  priority: S1
+- name: Folha - Mercado (RSS)
+  type: rss
+  url: https://feeds.folha.uol.com.br/mercado/rss091.xml
+  editoria: economia
+  priority: S1
+- name: UOL - Economia (RSS)
+  type: rss
+  url: https://rss.uol.com.br/feed/economia.xml
+  editoria: economia
+  priority: S1
+- name: InfoMoney - Feed
+  type: rss
+  url: https://www.infomoney.com.br/feed/
+  editoria: economia
+  priority: S2
+- name: Exame - Feed
+  type: rss
+  url: https://exame.com/feed/
+  editoria: economia
+  priority: S2
+- name: G1 - Ciencia e Saude (RSS)
+  type: rss
+  url: https://g1.globo.com/rss/g1/ciencia-e-saude/
+  editoria: saude
+  priority: S1
+- name: G1 - Natureza (RSS)
+  type: rss
+  url: https://g1.globo.com/rss/g1/natureza/
+  editoria: meio_ambiente
+  priority: S1
+- name: Nexo - Feed
+  type: rss
+  url: https://www.nexojornal.com.br/rss.xml
+  editoria: ciencia
+  priority: S2
+- name: Intercept Brasil - Feed
+  type: rss
+  url: https://www.intercept.com.br/feed/
+  editoria: seguranca
+  priority: S2
+- name: A Publica - Feed
+  type: rss
+  url: https://apublica.org/feed/
+  editoria: seguranca
+  priority: S2
+- name: Opera Mundi - RSS
+  type: rss
+  url: https://operamundi.uol.com.br/rss
+  editoria: internacional
+  priority: S1
+- name: G1 - Mundo (RSS)
+  type: rss
+  url: https://g1.globo.com/rss/g1/mundo/
+  editoria: internacional
+  priority: S1
+- name: NODAL - Feed
+  type: rss
+  url: https://www.nodal.am/feed/
+  editoria: internacional
+  priority: S2

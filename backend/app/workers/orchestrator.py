@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import logging
 import asyncio
-from typing import Dict, Any
 
 from app.celery_app import celery
 from app.scheduler import get_active_source_profiles
@@ -18,9 +17,7 @@ logger = logging.getLogger(__name__)
 @celery.task(name="app.workers.orchestrate_fetches")
 def orchestrate_fetches():
     """Celery Beat task to fan out fetches."""
-    # Since this is a sync Celery task but we use async DB calls:
-    loop = asyncio.get_event_loop()
-    profiles = loop.run_until_complete(get_active_source_profiles())
+    profiles = asyncio.run(get_active_source_profiles(only_due=True))
 
     for profile in profiles:
         # Determine routing key based on pool

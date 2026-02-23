@@ -38,6 +38,12 @@ class Event(Base):
         String(32), default=EventStatus.NEW, nullable=False, index=True
     )
     summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    draft_json: Mapped[dict | None] = mapped_column(
+        JSONB, nullable=True, comment="LLM generated structure: summary, facts, tone, etc."
+    )
+    sentiment_score: Mapped[float | None] = mapped_column(
+        Float, nullable=True, comment="-1.0 to 1.0"
+    )
     lane: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     score_plantao: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
     flags_json: Mapped[dict | None] = mapped_column(

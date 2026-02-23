@@ -34,11 +34,39 @@ class CMSConnector:
             "created_at": datetime.now(timezone.utc).isoformat()
         }
 
-        # Threshold check (§17): week fields require manual verification
+        # Threshold checks (§17): configurable by field type
+        thresholds = {
+            "person": 0.90,
+            "date": 0.85,
+            "value": 0.85,
+            "org": 0.80,
+        }
+        field_confidence = payload.get("field_confidence", {}) or {}
+        review_flags = []
+        for field_type, threshold in thresholds.items():
+            got = field_confidence.get(field_type)
+            if got is not None and float(got) < threshold:
+                review_flags.append(
+                    {
+                        "field_type": field_type,
+                        "confidence": float(got),
+                        "threshold": threshold,
+                    }
+                )
+
         confidence = payload.get("confidence", 1.0)
         if confidence < 0.7:
+            review_flags.append(
+                {
+                    "field_type": "global",
+                    "confidence": float(confidence),
+                    "threshold": 0.7,
+                }
+            )
+        if review_flags:
             news_article["needs_review"] = True
-            news_article["review_reason"] = "Low confidence in automated extraction"
+            news_article["review_reason"] = "Confidence threshold not met"
+            news_article["review_flags"] = review_flags
 
         logger.info(f"Pushing DRAFT to CMS for event {event_id}. Needs review: {news_article.get('needs_review', False)}")
         
@@ -49,5 +77,4 @@ def push_to_cms(event_id: int, payload: Dict[str, Any]):
     """Sync wrapper for Celery."""
     import asyncio
     connector = CMSConnector()
-    loop = asyncio.get_event_loop()
-    return loop.run_until_complete(connector.create_draft(event_id, payload))
+    return asyncio.run(connector.create_draft(event_id, payload))

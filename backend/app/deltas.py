@@ -36,11 +36,24 @@ def generate_temporal_delta(old_time: datetime | None, new_time: datetime | None
         "is_postponed": new_time > old_time if (new_time and old_time) else None
     }
 
+
+def generate_entity_delta(old_entities: List[str], new_entities: List[str]) -> Dict[str, Any]:
+    """§15: EntityDelta (MVP representation using normalized entity keys)."""
+    added = sorted(set(new_entities) - set(old_entities))
+    removed = sorted(set(old_entities) - set(new_entities))
+    if not added and not removed:
+        return {}
+    return {
+        "added": added,
+        "removed": removed,
+    }
+
 def generate_full_delta(old_doc: Dict[str, Any], new_doc: Dict[str, Any]) -> Dict[str, Any]:
     """Generate all structured deltas for a document update."""
     return {
         "anchors": generate_anchor_delta(old_doc.get("anchors", []), new_doc.get("anchors", [])),
         "values": generate_value_delta(old_doc.get("value"), new_doc.get("value")),
+        "entities": generate_entity_delta(old_doc.get("entities", []), new_doc.get("entities", [])),
         "temporal": generate_temporal_delta(old_doc.get("time"), new_doc.get("time")),
         "timestamp": datetime.now(timezone.utc).isoformat()
     }

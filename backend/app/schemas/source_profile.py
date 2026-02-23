@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import enum
-from typing import Optional, Dict, Any, Union
+from typing import Optional, Dict, Any
 
-from pydantic import BaseModel, Field, HttpUrl, field_validator
+from pydantic import BaseModel, Field, field_validator
 
 
 class PoolType(str, enum.Enum):
@@ -63,6 +63,7 @@ class SourceProfile(BaseModel):
     cadence: Cadence
     limits: Limits = Field(default_factory=Limits)
     observability: Observability = Field(default_factory=Observability)
+    metadata: Dict[str, Any] = Field(default_factory=dict)
 
     @field_validator("endpoints")
     @classmethod

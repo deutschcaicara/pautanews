@@ -1,0 +1,41 @@
+name: backend-ci
+
+on:
+  push:
+    paths:
+      - "backend/**"
+      - ".github/workflows/backend-ci.yml"
+  pull_request:
+    paths:
+      - "backend/**"
+      - ".github/workflows/backend-ci.yml"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: "backend/pyproject.toml"
+
+      - name: Install backend
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e backend
+
+      - name: Compile check
+        run: python -m compileall -q backend/app backend/tests backend/scripts
+
+      - name: Unit tests
+        run: python -m pytest -q backend/tests
+
+      - name: Replay backtest gate (best-effort/skip if legacy absent)
+        run: python backend/scripts/replay_backtest_gate.py
+

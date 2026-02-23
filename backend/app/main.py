@@ -1,11 +1,13 @@
-"""FastAPI application — health, metrics, CORS, SSE stub."""
+"""FastAPI application — health, metrics, CORS, SSE and product APIs."""
 from __future__ import annotations
 
+import asyncio
+import json
 import logging
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from prometheus_client import (
     CONTENT_TYPE_LATEST,
@@ -13,25 +15,40 @@ from prometheus_client import (
     generate_latest,
     multiprocess,
 )
-from starlette.responses import PlainTextResponse, Response, HTMLResponse
-from sqlalchemy import select, func, desc
+from starlette.responses import PlainTextResponse, Response, HTMLResponse, StreamingResponse
+from sqlalchemy import select, func, desc, and_, or_
 from app.db import async_session_factory
 from app.models.source import Source
-from app.models.event import Event, EventStatus, EventDoc
+from app.models.event import Event, EventStatus, EventDoc, EventState
 from app.models.document import Document
 from app.models.anchor import DocAnchor
+from app.models.entity_mention import EntityMention
+from app.models.merge import MergeAudit
+from app.models.feedback import FeedbackEvent
 from app.models.score import EventScore
+from app.deltas import generate_full_delta
 
 from app.config import settings
 from app.logging_config import setup_logging
+from app.metrics import SSE_EVENTS_SENT_TOTAL
+from app.observability import setup_opentelemetry
 
 logger = logging.getLogger(__name__)
+
+
+def _json_dumps(payload: dict) -> str:
+    return json.dumps(payload, ensure_ascii=False, default=str)
+
+
+def _sse_frame(event_type: str, payload: dict) -> str:
+    return f"event: {event_type}\ndata: {_json_dumps(payload)}\n\n"
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Application lifespan — setup / teardown."""
     setup_logging()
+    setup_opentelemetry(app)
     logger.info("Radar de Pautas API starting", extra={"env": settings.APP_ENV})
     yield
     logger.info("Radar de Pautas API shutting down")
@@ -55,8 +72,12 @@ app.add_middleware(
 
 
 from app.api.feedback import router as feedback_router
+from app.api.cms import router as cms_router
+from app.api.ui import router as ui_router
 
 app.include_router(feedback_router)
+app.include_router(cms_router)
+app.include_router(ui_router)
 
 # ── API ──
 @app.get("/api/events", tags=["content"])
@@ -64,13 +85,17 @@ async def get_events(status: str | None = None, lane: str | None = None, limit: 
     """Retorna feed de eventos com âncoras e scores."""
     async with async_session_factory() as session:
         stmt = (
-            select(Event, DocAnchor)
+            select(Event, EventDoc, DocAnchor, EventScore)
             .outerjoin(EventDoc, EventDoc.event_id == Event.id)
             .outerjoin(DocAnchor, DocAnchor.doc_id == EventDoc.doc_id)
+            .outerjoin(EventScore, EventScore.event_id == Event.id)
+            .where(Event.canonical_event_id.is_(None))
             .order_by(Event.score_plantao.desc(), Event.created_at.desc())
         )
         if status:
             stmt = stmt.where(Event.status == status)
+        else:
+            stmt = stmt.where(Event.status.notin_([EventStatus.IGNORED, EventStatus.EXPIRED]))
         if lane:
             stmt = stmt.where(Event.lane == lane)
             
@@ -79,24 +104,322 @@ async def get_events(status: str | None = None, lane: str | None = None, limit: 
         rows = result.all()
         
         events_dict = {}
-        for event, anchor in rows:
+        for event, event_doc, anchor, score_row in rows:
             if event.id not in events_dict:
                 events_dict[event.id] = {
                     "id": event.id,
                     "status": event.status,
                     "summary": event.summary,
                     "score": event.score_plantao,
+                    "score_oceano_azul": (score_row.score_oceano_azul if score_row else None),
                     "lane": event.lane,
                     "created_at": event.created_at,
-                    "anchors": []
+                    "last_seen_at": event.last_seen_at,
+                    "flags_json": event.flags_json,
+                    "anchors": [],
+                    "_anchors_seen": set(),
+                    "_doc_ids": set(),
+                    "_source_ids": set(),
+                    "reasons_json": (score_row.reasons_json if score_row else None),
                 }
+            if event_doc:
+                events_dict[event.id]["_doc_ids"].add(int(event_doc.doc_id))
+                events_dict[event.id]["_source_ids"].add(int(event_doc.source_id))
             if anchor:
-                events_dict[event.id]["anchors"].append({
-                    "type": anchor.anchor_type,
-                    "value": anchor.anchor_value
-                })
-        
-        return sorted(events_dict.values(), key=lambda x: x["score"], reverse=True)[:limit]
+                key = (str(anchor.anchor_type), str(anchor.anchor_value))
+                if key not in events_dict[event.id]["_anchors_seen"]:
+                    events_dict[event.id]["_anchors_seen"].add(key)
+                    events_dict[event.id]["anchors"].append({
+                        "type": anchor.anchor_type,
+                        "value": anchor.anchor_value
+                    })
+
+        payload = []
+        for row in events_dict.values():
+            row.pop("_anchors_seen", None)
+            row["doc_count"] = len(row.pop("_doc_ids", []))
+            row["source_count"] = len(row.pop("_source_ids", []))
+            payload.append(row)
+        return sorted(payload, key=lambda x: (x["score"] or 0.0), reverse=True)[:limit]
+
+
+@app.get("/api/plantao", tags=["content"])
+async def get_plantao(status: str | None = None, lane: str | None = None, limit: int = 20):
+    """Alias MVP para feed Plantão."""
+    return await get_events(status=status, lane=lane, limit=limit)
+
+
+@app.get("/api/events/{event_id}", tags=["content"])
+async def get_event_detail(event_id: int):
+    """Event detail (timeline/docs/anchors/scores) with basic tombstone support."""
+    async with async_session_factory() as session:
+        event = (await session.execute(select(Event).where(Event.id == event_id))).scalar()
+        if not event:
+            raise HTTPException(status_code=404, detail="Event not found")
+
+        if event.canonical_event_id:
+            canonical = (
+                await session.execute(select(Event).where(Event.id == event.canonical_event_id))
+            ).scalar()
+            return {
+                "id": event.id,
+                "status": event.status,
+                "tombstone": True,
+                "canonical_event_id": event.canonical_event_id,
+                "redirect_hint": f"/evento/{event.canonical_event_id}",
+                "canonical_event": (
+                    {
+                        "id": canonical.id,
+                        "status": canonical.status,
+                        "summary": canonical.summary,
+                        "lane": canonical.lane,
+                        "score_plantao": canonical.score_plantao,
+                    }
+                    if canonical
+                    else None
+                ),
+            }
+
+        score_row = (await session.execute(select(EventScore).where(EventScore.event_id == event_id))).scalar()
+
+        doc_rows = (
+            await session.execute(
+                select(Document, EventDoc)
+                .join(EventDoc, EventDoc.doc_id == Document.id)
+                .where(EventDoc.event_id == event_id)
+                .order_by(EventDoc.seen_at.desc())
+            )
+        ).all()
+
+        anchor_rows = (
+            await session.execute(
+                select(DocAnchor)
+                .join(EventDoc, EventDoc.doc_id == DocAnchor.doc_id)
+                .where(EventDoc.event_id == event_id)
+            )
+        ).scalars().all()
+
+        entity_rows = (
+            await session.execute(
+                select(EntityMention)
+                .join(EventDoc, EventDoc.doc_id == EntityMention.doc_id)
+                .where(EventDoc.event_id == event_id)
+            )
+        ).scalars().all()
+
+        deltas = None
+        if len(doc_rows) >= 2:
+            latest_doc_id = doc_rows[0][0].id
+            prev_doc_id = doc_rows[1][0].id
+            anchors_by_doc: dict[int, list[str]] = {latest_doc_id: [], prev_doc_id: []}
+            values_by_doc: dict[int, float | None] = {latest_doc_id: None, prev_doc_id: None}
+            entities_by_doc: dict[int, list[str]] = {latest_doc_id: [], prev_doc_id: []}
+
+            for a in anchor_rows:
+                if a.doc_id in anchors_by_doc:
+                    anchors_by_doc[a.doc_id].append(f"{a.anchor_type}:{a.anchor_value}")
+                    if a.anchor_type == "VALOR" and str(a.anchor_value).startswith("BRL:"):
+                        try:
+                            values_by_doc[a.doc_id] = float(str(a.anchor_value).split(":", 1)[1])
+                        except Exception:
+                            pass
+            for e in entity_rows:
+                if e.doc_id in entities_by_doc:
+                    entities_by_doc[e.doc_id].append(e.entity_key)
+
+            deltas = generate_full_delta(
+                {
+                    "anchors": anchors_by_doc[prev_doc_id],
+                    "value": values_by_doc[prev_doc_id],
+                    "entities": entities_by_doc[prev_doc_id],
+                    "time": None,
+                },
+                {
+                    "anchors": anchors_by_doc[latest_doc_id],
+                    "value": values_by_doc[latest_doc_id],
+                    "entities": entities_by_doc[latest_doc_id],
+                    "time": None,
+                },
+            )
+
+        return {
+            "event": {
+                "id": event.id,
+                "status": event.status,
+                "summary": event.summary,
+                "lane": event.lane,
+                "flags_json": event.flags_json,
+                "first_seen_at": event.first_seen_at,
+                "last_seen_at": event.last_seen_at,
+                "score_plantao": event.score_plantao,
+            },
+            "scores": {
+                "score_plantao": (score_row.score_plantao if score_row else None),
+                "score_oceano_azul": (score_row.score_oceano_azul if score_row else None),
+                "reasons_json": (score_row.reasons_json if score_row else None),
+            },
+            "docs": [
+                {
+                    "doc_id": doc.id,
+                    "url": doc.url,
+                    "canonical_url": doc.canonical_url,
+                    "title": doc.title,
+                    "author": doc.author,
+                    "published_at": doc.published_at,
+                    "modified_at": doc.modified_at,
+                    "lang": doc.lang,
+                    "snapshot_id": doc.snapshot_id,
+                    "version_no": doc.version_no,
+                    "seen_at": rel.seen_at,
+                    "is_primary": rel.is_primary,
+                }
+                for doc, rel in doc_rows
+            ],
+            "anchors": [
+                {
+                    "type": a.anchor_type,
+                    "value": a.anchor_value,
+                    "doc_id": a.doc_id,
+                }
+                for a in anchor_rows
+            ],
+            "entity_mentions": [
+                {
+                    "doc_id": e.doc_id,
+                    "entity_key": e.entity_key,
+                    "label": e.label,
+                    "confidence": e.confidence,
+                }
+                for e in entity_rows
+            ],
+            "deltas": deltas,
+        }
+
+
+@app.get("/api/events/{event_id}/state-history", tags=["content"])
+async def get_event_state_history(event_id: int, limit: int = 100):
+    """State transition history for an event."""
+    async with async_session_factory() as session:
+        event = (await session.execute(select(Event).where(Event.id == event_id))).scalar()
+        if not event:
+            raise HTTPException(status_code=404, detail="Event not found")
+        rows = (
+            await session.execute(
+                select(EventState)
+                .where(EventState.event_id == event_id)
+                .order_by(EventState.updated_at.desc(), EventState.id.desc())
+                .limit(max(1, min(limit, 500)))
+            )
+        ).scalars().all()
+        return {
+            "event_id": event_id,
+            "items": [
+                {
+                    "id": row.id,
+                    "status": row.status,
+                    "status_reason": row.status_reason,
+                    "updated_at": row.updated_at,
+                }
+                for row in rows
+            ],
+        }
+
+
+@app.get("/api/events/{event_id}/merge-audit", tags=["content"])
+async def get_event_merge_audit(event_id: int, limit: int = 100):
+    """Merge audit rows where event appears as source or target."""
+    async with async_session_factory() as session:
+        event = (await session.execute(select(Event).where(Event.id == event_id))).scalar()
+        if not event:
+            raise HTTPException(status_code=404, detail="Event not found")
+        rows = (
+            await session.execute(
+                select(MergeAudit)
+                .where(
+                    (MergeAudit.from_event_id == event_id) | (MergeAudit.to_event_id == event_id)
+                )
+                .order_by(MergeAudit.created_at.desc(), MergeAudit.id.desc())
+                .limit(max(1, min(limit, 500)))
+            )
+        ).scalars().all()
+        return {
+            "event_id": event_id,
+            "items": [
+                {
+                    "id": row.id,
+                    "from_event_id": row.from_event_id,
+                    "to_event_id": row.to_event_id,
+                    "reason_code": row.reason_code,
+                    "evidence_json": row.evidence_json,
+                    "created_at": row.created_at,
+                }
+                for row in rows
+            ],
+        }
+
+
+@app.get("/api/events/{event_id}/feedback", tags=["content"])
+async def get_event_feedback(event_id: int, limit: int = 100):
+    """Editorial feedback history for an event (for backtest inspection)."""
+    async with async_session_factory() as session:
+        event = (await session.execute(select(Event).where(Event.id == event_id))).scalar()
+        if not event:
+            raise HTTPException(status_code=404, detail="Event not found")
+        rows = (
+            await session.execute(
+                select(FeedbackEvent)
+                .where(FeedbackEvent.event_id == event_id)
+                .order_by(FeedbackEvent.created_at.desc(), FeedbackEvent.id.desc())
+                .limit(max(1, min(limit, 500)))
+            )
+        ).scalars().all()
+        return {
+            "event_id": event_id,
+            "items": [
+                {
+                    "id": row.id,
+                    "action": row.action,
+                    "actor": row.actor,
+                    "payload_json": row.payload_json,
+                    "created_at": row.created_at,
+                }
+                for row in rows
+            ],
+        }
+
+
+@app.get("/api/oceano-azul", tags=["content"])
+async def get_oceano_azul(limit: int = 20, min_score: float = 0.0):
+    """Oceano Azul ranking by SCORE_OCEANO_AZUL."""
+    async with async_session_factory() as session:
+        rows = (
+            await session.execute(
+                select(Event, EventScore)
+                .join(EventScore, EventScore.event_id == Event.id)
+                .where(
+                    Event.canonical_event_id.is_(None),
+                    EventScore.score_oceano_azul >= min_score,
+                    Event.status.notin_([EventStatus.IGNORED, EventStatus.EXPIRED]),
+                )
+                .order_by(EventScore.score_oceano_azul.desc(), Event.updated_at.desc())
+                .limit(limit)
+            )
+        ).all()
+
+        return [
+            {
+                "id": event.id,
+                "status": event.status,
+                "summary": event.summary,
+                "lane": event.lane,
+                "score_oceano_azul": score.score_oceano_azul,
+                "score_plantao": score.score_plantao,
+                "reasons_json": score.reasons_json,
+                "flags_json": event.flags_json,
+                "updated_at": event.updated_at,
+            }
+            for event, score in rows
+        ]
 
 
 # ─── Dashboard ───
@@ -114,7 +437,10 @@ async def dashboard():
             select(Event, DocAnchor)
             .outerjoin(EventDoc, EventDoc.event_id == Event.id)
             .outerjoin(DocAnchor, DocAnchor.doc_id == EventDoc.doc_id)
-            .where(Event.status != EventStatus.IGNORED)
+            .where(
+                Event.canonical_event_id.is_(None),
+                Event.status.notin_([EventStatus.IGNORED, EventStatus.EXPIRED]),
+            )
             .order_by(Event.score_plantao.desc(), Event.created_at.desc())
             .limit(60) # Joins can duplicate events
         )
@@ -364,11 +690,128 @@ async def metrics() -> Response:
     return PlainTextResponse(content=data, media_type=CONTENT_TYPE_LATEST)
 
 
-# ── SSE placeholder (expanded in M3) ──
 @app.get("/events/stream", tags=["sse"])
-async def sse_stream() -> PlainTextResponse:
-    """SSE endpoint stub — implemented in M3."""
-    return PlainTextResponse(
-        content="event: ping\ndata: {}\n\n",
+async def sse_stream(request: Request) -> StreamingResponse:
+    """SSE endpoint (DB-polling MVP) emitting upserts, state changes and merges."""
+
+    async def event_generator() -> AsyncGenerator[str, None]:
+        last_event_cursor_ts = None
+        last_event_cursor_id = 0
+        last_state_cursor_ts = None
+        last_state_cursor_id = 0
+        last_merge_cursor_ts = None
+        last_merge_cursor_id = 0
+
+        while True:
+            if await request.is_disconnected():
+                break
+
+            emitted = False
+            async with async_session_factory() as session:
+                event_stmt = (
+                    select(Event, EventScore)
+                    .outerjoin(EventScore, EventScore.event_id == Event.id)
+                    .where(Event.canonical_event_id.is_(None))
+                    .order_by(Event.updated_at.asc(), Event.id.asc())
+                    .limit(100)
+                )
+                if last_event_cursor_ts is not None:
+                    event_stmt = event_stmt.where(
+                        or_(
+                            Event.updated_at > last_event_cursor_ts,
+                            and_(
+                                Event.updated_at == last_event_cursor_ts,
+                                Event.id > last_event_cursor_id,
+                            ),
+                        )
+                    )
+                event_rows = (await session.execute(event_stmt)).all()
+                for event, score in event_rows:
+                    emitted = True
+                    SSE_EVENTS_SENT_TOTAL.labels(event_type="EVENT_UPSERT").inc()
+                    yield _sse_frame(
+                        "EVENT_UPSERT",
+                        {
+                            "id": event.id,
+                            "status": event.status,
+                            "summary": event.summary,
+                            "lane": event.lane,
+                            "flags_json": event.flags_json,
+                            "updated_at": event.updated_at,
+                            "score_plantao": (score.score_plantao if score else event.score_plantao),
+                            "score_oceano_azul": (score.score_oceano_azul if score else None),
+                            "reasons_json": (score.reasons_json if score else None),
+                        },
+                    )
+                    last_event_cursor_ts = event.updated_at
+                    last_event_cursor_id = int(event.id)
+
+                state_stmt = select(EventState).order_by(EventState.updated_at.asc(), EventState.id.asc()).limit(100)
+                if last_state_cursor_ts is not None:
+                    state_stmt = state_stmt.where(
+                        or_(
+                            EventState.updated_at > last_state_cursor_ts,
+                            and_(
+                                EventState.updated_at == last_state_cursor_ts,
+                                EventState.id > last_state_cursor_id,
+                            ),
+                        )
+                    )
+                state_rows = (await session.execute(state_stmt)).scalars().all()
+                for row in state_rows:
+                    emitted = True
+                    SSE_EVENTS_SENT_TOTAL.labels(event_type="EVENT_STATE_CHANGED").inc()
+                    yield _sse_frame(
+                        "EVENT_STATE_CHANGED",
+                        {
+                            "event_id": row.event_id,
+                            "status": row.status,
+                            "status_reason": row.status_reason,
+                            "updated_at": row.updated_at,
+                        },
+                    )
+                    last_state_cursor_ts = row.updated_at
+                    last_state_cursor_id = int(row.id)
+
+                merge_stmt = select(MergeAudit).order_by(MergeAudit.created_at.asc(), MergeAudit.id.asc()).limit(100)
+                if last_merge_cursor_ts is not None:
+                    merge_stmt = merge_stmt.where(
+                        or_(
+                            MergeAudit.created_at > last_merge_cursor_ts,
+                            and_(
+                                MergeAudit.created_at == last_merge_cursor_ts,
+                                MergeAudit.id > last_merge_cursor_id,
+                            ),
+                        )
+                    )
+                merge_rows = (await session.execute(merge_stmt)).scalars().all()
+                for row in merge_rows:
+                    emitted = True
+                    SSE_EVENTS_SENT_TOTAL.labels(event_type="EVENT_MERGED").inc()
+                    yield _sse_frame(
+                        "EVENT_MERGED",
+                        {
+                            "from_event_id": row.from_event_id,
+                            "to_event_id": row.to_event_id,
+                            "reason_code": row.reason_code,
+                            "evidence_json": row.evidence_json,
+                            "created_at": row.created_at,
+                        },
+                    )
+                    last_merge_cursor_ts = row.created_at
+                    last_merge_cursor_id = int(row.id)
+
+            if not emitted:
+                SSE_EVENTS_SENT_TOTAL.labels(event_type="ping").inc()
+                yield _sse_frame("ping", {})
+            await asyncio.sleep(1.0)
+
+    return StreamingResponse(
+        event_generator(),
         media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
     )

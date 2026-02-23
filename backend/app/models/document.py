@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, func, Index
+from sqlalchemy import BigInteger, DateTime, ForeignKey, Integer, String, Text, func, Index
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base
@@ -29,6 +29,9 @@ class Document(Base):
     lang: Mapped[str | None] = mapped_column(String(8), nullable=True)
     content_hash: Mapped[str] = mapped_column(
         String(64), nullable=False, index=True, comment="SHA-256 of clean_text"
+    )
+    simhash: Mapped[int | None] = mapped_column(
+        BigInteger, nullable=True, index=True, comment="SimHash 64-bit for similarity"
     )
     version_no: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     snapshot_id: Mapped[int | None] = mapped_column(

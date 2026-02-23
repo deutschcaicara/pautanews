@@ -8,12 +8,16 @@ from celery import Celery
 from kombu import Exchange, Queue
 
 from app.config import settings
+from app.observability import setup_opentelemetry
 
 celery = Celery(
     "radar",
     broker=settings.CELERY_BROKER_URL,
     backend=settings.REDIS_URL,
 )
+
+# Best-effort OTel bootstrap for worker process imports.
+setup_opentelemetry()
 
 # ── Serialisation ──
 celery.conf.accept_content = ["json"]
@@ -43,6 +47,7 @@ celery.conf.task_queues = (
     Queue("organize", default_exchange, routing_key="organize"),
     Queue("score", default_exchange, routing_key="score"),
     Queue("alerts", default_exchange, routing_key="alerts"),
+    Queue("nlp", default_exchange, routing_key="nlp"),
     # Error handling
     Queue("retry", default_exchange, routing_key="retry"),
     Queue("dead_letter", default_exchange, routing_key="dead_letter"),
@@ -54,14 +59,17 @@ celery.conf.task_default_routing_key = "fetch_fast"
 
 # ── Task routes ──
 celery.conf.task_routes = {
-    "app.workers.fetch_fast.*": {"queue": "fetch_fast"},
-    "app.workers.extract_fast.*": {"queue": "extract_fast"},
-    "app.workers.fetch_render.*": {"queue": "fetch_render"},
-    "app.workers.fetch_deep.*": {"queue": "fetch_deep"},
-    "app.workers.extract_deep.*": {"queue": "extract_deep"},
-    "app.workers.organize.*": {"queue": "organize"},
-    "app.workers.score.*": {"queue": "score"},
-    "app.workers.alerts.*": {"queue": "alerts"},
+    # Exact task names used in this codebase
+    "app.workers.fetch.run_fetch": {"queue": "fetch_fast"},
+    "app.workers.extract.run_extraction": {"queue": "extract_fast"},
+    "app.workers.orchestrate_fetches": {"queue": "organize"},
+    "app.workers.organize.run_organization": {"queue": "organize"},
+    "app.workers.score.run_scoring": {"queue": "score"},
+    "app.workers.alerts.run_alerts": {"queue": "alerts"},
+    "app.workers.draft.run_drafting": {"queue": "nlp"},
+    "app.workers.state_maintenance.run_state_maintenance": {"queue": "organize"},
+    "app.workers.canonicalize.run_canonicalize": {"queue": "organize"},
+    "app.workers.queue_metrics.run_queue_metrics_probe": {"queue": "organize"},
 }
 
 # ── Beat Schedule ──
@@ -69,6 +77,18 @@ celery.conf.beat_schedule = {
     "orchestrate-every-minute": {
         "task": "app.workers.orchestrate_fetches",
         "schedule": 60.0,
+    },
+    "state-maintenance-every-30s": {
+        "task": "app.workers.state_maintenance.run_state_maintenance",
+        "schedule": 30.0,
+    },
+    "canonicalize-every-2m": {
+        "task": "app.workers.canonicalize.run_canonicalize",
+        "schedule": 120.0,
+    },
+    "queue-metrics-every-15s": {
+        "task": "app.workers.queue_metrics.run_queue_metrics_probe",
+        "schedule": 15.0,
     },
 }
 

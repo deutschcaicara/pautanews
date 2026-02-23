@@ -1,156 +1,111 @@
-"""Initial seed data for journalistic sources — Blueprint §6."""
+"""Initial seed data for journalistic sources — Blueprint §6.
+Loads directly from legacy YAML for maximum fidelity.
+"""
 import asyncio
 import logging
+import yaml
+from pathlib import Path
+from urllib.parse import urlparse
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+
 from app.db import async_session_factory
 from app.models.source import Source
+from app.core.taxonomy import infer_source_class, infer_source_group
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-INITIAL_SOURCES = [
-    {
-        "domain": "g1.globo.com",
-        "name": "G1 - Política",
-        "tier": 1,
-        "is_official": False,
-        "fetch_policy_json": {
-            "source_id": "g1_politica",
-            "source_domain": "g1.globo.com",
-            "tier": 1,
-            "pool": "FAST_POOL",
-            "strategy": "RSS",
-            "endpoints": {"feed": "https://g1.globo.com/rss/g1/politica/"},
-            "cadence": {"interval_seconds": 60},
-            "limits": {"rate_limit_req_per_min": 10},
-        }
-    },
-    {
-        "domain": "agenciabrasil.ebc.com.br",
-        "name": "Agência Brasil - Política",
-        "tier": 1,
-        "is_official": True,
-        "fetch_policy_json": {
-            "source_id": "agencia_brasil_politica",
-            "source_domain": "agenciabrasil.ebc.com.br",
-            "tier": 1,
-            "pool": "FAST_POOL",
-            "strategy": "RSS",
-            "endpoints": {"feed": "https://agenciabrasil.ebc.com.br/rss/politica/feed.xml"},
-            "cadence": {"interval_seconds": 300},
-            "limits": {"rate_limit_req_per_min": 10},
-        }
-    },
-    {
-        "domain": "www12.senado.leg.br",
-        "name": "Senado - Notícias",
-        "tier": 1,
-        "is_official": True,
-        "fetch_policy_json": {
-            "source_id": "senado_noticias",
-            "source_domain": "senado.leg.br",
-            "tier": 1,
-            "pool": "FAST_POOL",
-            "strategy": "RSS",
-            "endpoints": {"feed": "https://www12.senado.leg.br/noticias/rss"},
-            "cadence": {"interval_seconds": 600},
-            "limits": {"rate_limit_req_per_min": 5},
-        }
-    },
-    {
-        "domain": "www.camara.leg.br",
-        "name": "Câmara - Notícias",
-        "tier": 1,
-        "is_official": True,
-        "fetch_policy_json": {
-            "source_id": "camara_noticias",
-            "source_domain": "camara.leg.br",
-            "tier": 1,
-            "pool": "FAST_POOL",
-            "strategy": "HTML",
-            "endpoints": {"latest": "https://www.camara.leg.br/noticias/"},
-            "cadence": {"interval_seconds": 1800},
-            "limits": {"rate_limit_req_per_min": 5},
-        }
-    },
-    {
-        "domain": "www.poder360.com.br",
-        "name": "Poder360",
-        "tier": 1,
-        "is_official": False,
-        "fetch_policy_json": {
-            "source_id": "poder360",
-            "source_domain": "poder360.com.br",
-            "tier": 1,
-            "pool": "FAST_POOL",
-            "strategy": "RSS",
-            "endpoints": {"feed": "https://www.poder360.com.br/feed/"},
-            "cadence": {"interval_seconds": 300},
-            "limits": {"rate_limit_req_per_min": 5},
-        }
-    },
-    {
-        "domain": "www.jota.info",
-        "name": "JOTA - Notícias",
-        "tier": 1,
-        "is_official": False,
-        "fetch_policy_json": {
-            "source_id": "jota_noticias",
-            "source_domain": "jota.info",
-            "tier": 1,
-            "pool": "FAST_POOL",
-            "strategy": "RSS",
-            "endpoints": {"feed": "https://www.jota.info/feed"},
-            "cadence": {"interval_seconds": 600},
-            "limits": {"rate_limit_req_per_min": 5},
-        }
-    },
-    {
-        "domain": "in.gov.br",
-        "name": "Diário Oficial da União",
-        "tier": 1,
-        "is_official": True,
-        "fetch_policy_json": {
-            "source_id": "dou_oficial",
-            "source_domain": "in.gov.br",
-            "tier": 1,
-            "pool": "DEEP_EXTRACT_POOL",
-            "strategy": "HTML",
-            "endpoints": {"latest": "https://www.in.gov.br/leitura-digital"},
-            "cadence": {"cron": "0 * * * *"}, # Hourly
-            "limits": {"rate_limit_req_per_min": 5},
-        }
-    },
-    {
-        "domain": "tcu.gov.br",
-        "name": "TCU - Notícias",
-        "tier": 1,
-        "is_official": True,
-        "fetch_policy_json": {
-            "source_id": "tcu_noticias",
-            "source_domain": "tcu.gov.br",
-            "tier": 1,
-            "pool": "FAST_POOL",
-            "strategy": "HTML",
-            "endpoints": {"latest": "https://portal.tcu.gov.br/imprensa/noticias/"},
-            "cadence": {"interval_seconds": 3600},
-            "limits": {"rate_limit_req_per_min": 2},
-        }
-    }
-]
+LEGACY_YAML_PATH = Path("/home/diego/news/bootstrap/config/sources.yaml")
+INTERNAL_YAML_PATH = Path("/app/sources_legacy.yaml")
+INSTITUTIONAL_UA = "RadarHardNews/1.0 (Institutional; newsroom monitoring)"
 
 async def seed_sources():
+    path = LEGACY_YAML_PATH if LEGACY_YAML_PATH.exists() else INTERNAL_YAML_PATH
+    if not path.exists():
+        logger.error(f"Legacy sources YAML not found at {LEGACY_YAML_PATH} nor {INTERNAL_YAML_PATH}")
+        return
+
+    with open(path, "r") as f:
+        data = yaml.safe_load(f)
+    
+    legacy_sources = data.get("sources", [])
+    logger.info(f"Found {len(legacy_sources)} sources in legacy YAML.")
+
+    priority_map = {"S0": 1, "S1": 2, "S2": 3}
+    type_map = {"rss": "RSS", "watch": "HTML"}
+
     async with async_session_factory() as session:
-        for src_data in INITIAL_SOURCES:
-            logger.info(f"Seeding source: {src_data['domain']}")
-            source = Source(**src_data)
+        # Check if we already have sources to avoid duplicates
+        stmt = select(Source.domain)
+        result = await session.execute(stmt)
+        existing_domains = set(result.scalars().all())
+
+        new_sources_count = 0
+        for s in legacy_sources:
+            name = s.get("name")
+            url = s.get("url")
+            stype = s.get("type")
+            editoria = s.get("editoria")
+            priority = s.get("priority", "S2")
+            
+            domain = urlparse(url).hostname or "unknown" if url else "unknown"
+            if domain in existing_domains:
+                continue
+                
+            tier = priority_map.get(priority, 3)
+            strategy = type_map.get(stype, "HTML")
+            source_id = name.lower().replace(" ", "_").replace("-", "_").replace(".", "_")
+            
+            # Use taxonomy to infer class and group
+            s_class = infer_source_class(name, url)
+            s_group = infer_source_group(name, url, s_class)
+
+            policy = {
+                "source_id": source_id,
+                "source_domain": domain,
+                "tier": tier,
+                "is_official": bool(".gov.br" in domain or ".leg.br" in domain or ".jus.br" in domain or s_class == "primary"),
+                "lang": "pt-BR",
+                "pool": "FAST_POOL",
+                "strategy": strategy,
+                "endpoints": {"feed" if strategy == "RSS" else "latest": url},
+                "headers": {"User-Agent": INSTITUTIONAL_UA},
+                "cadence": {"interval_seconds": 600 if tier == 1 else 1800 if tier == 2 else 3600},
+                "limits": {"rate_limit_req_per_min": 10},
+                "observability": {
+                    "starvation_window_hours": 24,
+                    "yield_keys": ["anchors_count", "evidence_score"],
+                    "baseline_rolling": True,
+                    "calendar_profile": "business_hours_br",
+                },
+                "metadata": {
+                    "legacy_editoria": editoria,
+                    "source_class": s_class,
+                    "source_group": s_group
+                }
+            }
+            
+            source = Source(
+                domain=domain,
+                name=name,
+                tier=tier,
+                is_official=bool(policy["is_official"]),
+                fetch_policy_json=policy
+            )
             session.add(source)
-        try:
-            await session.commit()
-            logger.info("Seeding completed successfully.")
-        except Exception as e:
-            await session.rollback()
-            logger.error(f"Error seeding sources: {e}")
+            existing_domains.add(domain)
+            new_sources_count += 1
+
+        if new_sources_count > 0:
+            try:
+                await session.commit()
+                logger.info(f"Seeded {new_sources_count} new sources successfully.")
+            except Exception as e:
+                await session.rollback()
+                logger.error(f"Error seeding sources: {e}")
+        else:
+            logger.info("No new sources to seed.")
 
 if __name__ == "__main__":
     asyncio.run(seed_sources())

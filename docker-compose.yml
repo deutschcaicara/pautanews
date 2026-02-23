@@ -1,9 +1,10 @@
-version: "3.9"
-
 x-backend-env: &backend-env
   DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://radar:radar_secret@postgres:5432/radar_news}
   DATABASE_URL_SYNC: ${DATABASE_URL_SYNC:-postgresql+psycopg2://radar:radar_secret@postgres:5432/radar_news}
   CELERY_BROKER_URL: ${CELERY_BROKER_URL:-amqp://radar:radar_secret@rabbitmq:5672//}
+  RABBITMQ_MANAGEMENT_URL: ${RABBITMQ_MANAGEMENT_URL:-http://rabbitmq:15672}
+  RABBITMQ_MANAGEMENT_USER: ${RABBITMQ_MANAGEMENT_USER:-radar}
+  RABBITMQ_MANAGEMENT_PASSWORD: ${RABBITMQ_MANAGEMENT_PASSWORD:-radar_secret}
   REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
   APP_ENV: ${APP_ENV:-development}
   APP_LOG_LEVEL: ${APP_LOG_LEVEL:-INFO}
@@ -107,7 +108,7 @@ services:
     command: >
       celery -A app.celery_app:celery worker
       --loglevel=info
-      -Q fetch_render,extract_deep
+      -Q fetch_render
       -c 2
       -n heavy@%h
     environment:
@@ -129,7 +130,7 @@ services:
     command: >
       celery -A app.celery_app:celery worker
       --loglevel=info
-      -Q fetch_deep,organize,score,alerts
+      -Q fetch_deep,extract_deep,organize,score,alerts,nlp
       -c 2
       -n deep@%h
     environment:
@@ -139,6 +140,26 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  celery-ops:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    command: >
+      celery -A app.celery_app:celery worker
+      --loglevel=info
+      -Q retry,dead_letter
+      -c 1
+      -n ops@%h
+    environment:
+      <<: *backend-env
+    volumes:
+      - ./backend:/app
+    depends_on:
       rabbitmq:
         condition: service_healthy
       redis:

@@ -161,6 +161,69 @@ def infer_source_class(source_name: str, source_url: str, current_class: str = "
     return "other"
 
 
+def infer_source_group(
+    source_name: str,
+    source_url: str,
+    source_class: str,
+    explicit_group: str = "",
+) -> str:
+    explicit_group_norm = normalize_text(explicit_group)
+    host = normalize_text(urlparse(str(source_url or "")).hostname or "")
+
+    host_group = ""
+    host_group_len = -1
+    for group, suffixes in MEDIA_GROUP_HOST_SUFFIXES.items():
+        for suffix in suffixes:
+            suffix_norm = normalize_text(suffix)
+            if not suffix_norm:
+                continue
+            if host == suffix_norm or host.endswith(f".{suffix_norm}"):
+                if len(suffix_norm) > host_group_len:
+                    host_group = group
+                    host_group_len = len(suffix_norm)
+
+    if host_group:
+        if explicit_group_norm and explicit_group_norm not in GENERIC_SOURCE_GROUPS and explicit_group_norm != host_group:
+            return explicit_group_norm
+        return host_group
+    if explicit_group_norm:
+        return explicit_group_norm
+
+    source_name_norm = normalize_text(source_name)
+    keyword_groups = {
+        "uol": ("uol", "universo online", "opera mundi", "operamundi"),
+        "globo": ("globo", "g1", "valor economico", "oglobo"),
+        "folha": ("folha", "folha de s paulo"),
+        "estadao": ("estadao", "o estado de s paulo"),
+        "cnn_brasil": ("cnn brasil",),
+        "metropoles": ("metropoles",),
+        "r7": ("r7", "record"),
+        "terra": ("terra",),
+        "jp": ("jovem pan", "jp.com"),
+        "infomoney": ("infomoney",),
+        "exame": ("exame",),
+        "forum": ("revista forum",),
+        "brasil_de_fato": ("brasil de fato",),
+        "nodal": ("nodal",),
+    }
+    for group, tokens in keyword_groups.items():
+        if any(token in source_name_norm for token in tokens):
+            return group
+
+    source_class_norm = normalize_text(source_class)
+    if source_class_norm == "primary":
+        return "oficial"
+    if source_class_norm == "competitor":
+        return "mainstream"
+    if source_class_norm == "independent":
+        return "independente"
+    if source_class_norm == "specialized":
+        return "especializado"
+    if source_class_norm == "legacy":
+        return "legacy"
+    return "outros"
+
+
 def infer_editorial_lane(
     *,
     explicit_lane: str | None = None,
