@@ -5,6 +5,9 @@ from app.workers.fetch import _prepare_request_spec
 
 
 def _profile(metadata: dict | None = None) -> SourceProfile:
+    md = {"spa_api_contract": {"items_path": "items", "text_fields": ["text"]}}
+    if metadata:
+        md.update(metadata)
     return SourceProfile(
         id=1,
         source_id="spa_api_test",
@@ -12,14 +15,14 @@ def _profile(metadata: dict | None = None) -> SourceProfile:
         tier=1,
         is_official=True,
         lang="pt-BR",
-        pool="FAST_POOL",
+        pool="HEAVY_RENDER_POOL",
         strategy="SPA_API",
         endpoints={"api": "https://api.example.com/v1/items"},
         headers={"User-Agent": "RadarTest/1.0"},
         cadence={"interval_seconds": 60},
         limits={"rate_limit_req_per_min": 10, "concurrency_per_domain": 1, "timeout_seconds": 10, "max_bytes": 100000},
         observability={"starvation_window_hours": 24, "yield_keys": [], "baseline_rolling": True},
-        metadata=metadata or {},
+        metadata=md,
     )
 
 
@@ -52,4 +55,3 @@ def test_prepare_request_spec_applies_spa_api_request_overrides() -> None:
     assert spec["json"] == {"query": "licitacao"}
     assert spec["headers"]["X-Token"] == "abc"
     assert spec["headers"]["User-Agent"] == "U"
-

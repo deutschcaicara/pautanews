@@ -1,6 +1,6 @@
 # Status / Handoff — Pendências Reais (Fev/2026)
 
-Data: 2026-02-22
+Data: 2026-02-23
 
 Objetivo deste arquivo:
 - registrar o que já foi implementado e validado localmente
@@ -21,25 +21,31 @@ Implementado e validado no repositório:
 - CMS Draft endpoint MVP
 - Observabilidade custom (Prometheus) + queue probe com RabbitMQ Management opcional
 - Backtest gate script (com `skip` controlado quando faltam DB/dataset/legado)
+- Backtest gate com fallback por fixture local (crise/normal/marasmo) para validação executável sem DB externo
+- Validação forte do `SourceProfile` (strategy/pool/cadence/endpoints/metadata)
+- Conversor de fontes legado `~/news` -> DSL do backend com validação (`backend/convert_sources.py`)
+- Seed preserva múltiplos endpoints do mesmo domínio (ex.: notícias + agenda), evitando perda de cobertura editorial
 
 ## Validação local concluída
 
 Executado com `.venv` local:
 - `python3 -m compileall -q backend/app backend/tests backend/scripts` ✅
-- `.venv/bin/python -m pytest -q backend/tests` ✅ `29 passed`
-- `.venv/bin/python backend/scripts/replay_backtest_gate.py` ✅ `skip` (sem `RADAR_DB_URL` / dataset no legado)
+- `.venv/bin/python -m pytest -q backend/tests` ✅ `42 passed`
+- `.venv/bin/python backend/scripts/replay_backtest_gate.py` ✅ `pass` (fallback fixture local com cenários crise/normal/marasmo)
+- `.venv/bin/python backend/convert_sources.py --validate` ✅ (`~/news` convertido e validado: 150 fontes)
 
 ## O que AINDA falta (realmente)
 
 ### 1. Dependência de infraestrutura / ambiente (não é bug local)
 
-1. Backtest gate real no CI/CD
+1. Backtest gate real no CI/CD (com dados reais)
 - Falta:
   - ambiente com acesso ao legado `/home/diego/news` (ou benchmark equivalente)
   - `RADAR_DB_URL` válido
   - dataset/DB de benchmark
 - Hoje:
-  - script existe e falha/`skip` corretamente sem esses requisitos
+  - script roda localmente com fixture e valida thresholds
+  - benchmark real ainda depende de DB/dataset/legado acessíveis
 
 2. Métricas de backlog/DLQ de produção
 - Falta:
@@ -54,19 +60,19 @@ Executado com `.venv` local:
 - Hoje:
   - framework está implementado, mas calibração depende da fonte real
 
-### 2. Pendências de produto/UX (não bloqueiam pipeline)
+### 2. Pendências backend de produto (sem frontend)
 
-1. UI “final rica” (polimento)
-- Falta:
-  - refinamento visual/UX e fluxo editorial mais sofisticado
-- Hoje:
-  - UI MVP funcional já existe para Plantão/Oceano/Evento com ações
-
-2. Regras editoriais avançadas de `SPLIT`
+1. Regras editoriais avançadas de `SPLIT`
 - Falta:
   - políticas mais sofisticadas (ex.: recomputar/reatribuir summary/lane por docs movidos, guardrails editoriais avançados)
 - Hoje:
   - `SPLIT` MVP funcional via `feedback`
+
+2. Calibração final de ranking/merge com benchmark real
+- Falta:
+  - ajustar thresholds e heurísticas com replay de cenários reais (crise/normal/marasmo)
+- Hoje:
+  - gate e fixture local existem, mas calibração com produção ainda não foi fechada
 
 ## O que NÃO está faltando (já entregue)
 
@@ -115,4 +121,4 @@ RABBITMQ_MANAGEMENT_PASSWORD=radar_secret
 Se quiser fechar o que resta de forma prática:
 1. Preparar ambiente de benchmark (`RADAR_DB_URL` + dataset) e rodar `replay_backtest_gate.py` em modo estrito
 2. Validar 2–3 fontes reais `SPA_API/HEADLESS/PDF` e ajustar `metadata` por fonte
-3. Polir UI (visual/fluxo), se isso for requisito de entrega final
+3. (Opcional, fora deste escopo) Frontend editorial será tratado em etapa separada

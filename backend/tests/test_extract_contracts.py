@@ -7,6 +7,7 @@ from app.workers.extract import _extract_api_items, _extract_xhr_json_blob
 
 
 def _profile(strategy: str = "SPA_API", metadata: dict | None = None) -> SourceProfile:
+    pool = "HEAVY_RENDER_POOL" if strategy == "SPA_API" else "FAST_POOL"
     return SourceProfile(
         id=1,
         source_id="api_test",
@@ -14,7 +15,7 @@ def _profile(strategy: str = "SPA_API", metadata: dict | None = None) -> SourceP
         tier=1,
         is_official=True,
         lang="pt-BR",
-        pool="FAST_POOL",
+        pool=pool,
         strategy=strategy,
         endpoints={"api": "https://api.example.com/v1/items"},
         headers={"User-Agent": "test"},
@@ -84,4 +85,3 @@ def test_extract_api_items_fallbacks_without_contract() -> None:
     assert all(i["content_hash"] for i in items)
     assert items[0]["url"] == "https://api.example.com/v1/items"
     assert items[1]["url"] == "https://example.com/b"
-
