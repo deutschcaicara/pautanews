@@ -1,0 +1,43 @@
+name: TEMP STF public docket download
+on:
+  push:
+    branches: [temp-stf-public-download]
+permissions:
+  contents: read
+jobs:
+  download:
+    strategy:
+      fail-fast: false
+      max-parallel: 6
+      matrix:
+        include:
+          - {classe: PET, numero: '15556', slug: PET_15556}
+          - {classe: INQ, numero: '5026', slug: INQ_5026}
+          - {classe: RCL, numero: '88121', slug: RCL_88121}
+          - {classe: PET, numero: '15198', slug: PET_15198}
+          - {classe: INQ, numero: '5035', slug: INQ_5035}
+          - {classe: PET, numero: '15478', slug: PET_15478}
+          - {classe: PET, numero: '15504', slug: PET_15504}
+          - {classe: PET, numero: '15562', slug: PET_15562}
+          - {classe: PET, numero: '15563', slug: PET_15563}
+          - {classe: PET, numero: '15693', slug: PET_15693}
+          - {classe: PET, numero: '15976', slug: PET_15976}
+          - {classe: PET, numero: '15977', slug: PET_15977}
+          - {classe: PET, numero: '15978', slug: PET_15978}
+          - {classe: PET, numero: '16019', slug: PET_16019}
+          - {classe: PET, numero: '16662', slug: PET_16662}
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - run: pip install --disable-pip-version-check requests beautifulsoup4
+      - run: python tools/stf_temp_download.py --classe '${{ matrix.classe }}' --numero '${{ matrix.numero }}'
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: STF-${{ matrix.slug }}
+          path: stf_download/${{ matrix.slug }}/
+          retention-days: 1
+          if-no-files-found: warn
